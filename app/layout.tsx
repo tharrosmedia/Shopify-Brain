@@ -15,7 +15,11 @@ async function setActiveStore(formData: FormData) {
   'use server';
   const storeId = formData.get('storeId') as string;
   const cookieStore = await cookies();
-  cookieStore.set('activeStoreId', storeId, { path: '/' });
+  cookieStore.set('activeStoreId', storeId, {
+    path: '/',
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+  });
   redirect('/');
 }
 

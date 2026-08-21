@@ -1,48 +1,24 @@
 import { listDrafts } from '@/src/lib/db/drafts';
-import { getDraft } from '@/src/lib/db/drafts';
-import { saveApproval } from '@/src/lib/db/approvals';
-import { updateJobStatus } from '@/src/lib/db/jobs';
-import { inngest } from '@/src/inngest/client';
 import Link from 'next/link';
 import { cookies } from 'next/headers';
 import { listStores } from '@/src/lib/db/stores';
 
-async function decideAction(formData: FormData) {
-  'use server';
-  const draftId = formData.get('draftId') as string;
-  const status = formData.get('status') as string;
-  const notes = formData.get('notes') as string || '';
-  const jobId = formData.get('jobId') as string;
-  const cookieStore = await cookies();
-  let storeId = cookieStore.get('activeStoreId')?.value || process.env.DEV_STORE_ID || '11111111-1111-1111-1111-111111111111';
-  if (!storeId || storeId === 'undefined') storeId = '11111111-1111-1111-1111-111111111111';
-
-  const editedPayloadStr = formData.get('editedPayload') as string;
-  let editedPayload = undefined;
-  if (editedPayloadStr) {
-    try { editedPayload = JSON.parse(editedPayloadStr); } catch {}
-  }
-
-  await saveApproval({ jobId, storeId, status, reviewerNotes: notes, editedPayload });
-
-  await inngest.send({
-    name: 'approval/decided',
-    data: { status, notes, editedPayload, jobId, draftId },
-  });
-
-  if (status !== 'edited') {
-    await updateJobStatus(jobId, status === 'approved' ? 'approved' : 'rejected');
-  }
-}
-
 export const dynamic = 'force-dynamic';
 
-export default async function Review() {
+export default async function Review({ searchParams }: { searchParams: Promise<{ success?: string }> }) {
+  const params = await searchParams;
   const cookieStore = await cookies();
   let storeId = cookieStore.get('activeStoreId')?.value || process.env.DEV_STORE_ID || '11111111-1111-1111-1111-111111111111';
   if (!storeId || storeId === 'undefined') {
     const stores = await listStores();
     storeId = stores[0]?.id || '11111111-1111-1111-1111-111111111111';
+    if (stores[0]) {
+      cookieStore.set('activeStoreId', storeId, {
+        path: '/',
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+      });
+    }
   }
   let drafts: any[] = [];
   let loadError: string | null = null;
@@ -56,6 +32,12 @@ export default async function Review() {
     <div className="p-8 max-w-6xl mx-auto">
       <h1 className="text-2xl font-bold mb-6">Review Queue</h1>
       <Link href="/" className="underline mb-4 block">Back to Dashboard</Link>
+
+      {params.success === 'decision-submitted' && (
+        <div className="mb-4 p-3 bg-green-100 text-green-700 rounded text-sm">
+          Decision submitted! Inngest will process the approval and publish if approved.
+        </div>
+      )}
 
       {loadError && <div className="mb-4 p-3 bg-red-100 text-red-700 rounded text-sm">Error: {loadError}</div>}
 

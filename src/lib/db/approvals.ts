@@ -12,3 +12,9 @@ export async function getApprovalByJobId(jobId: string) {
   const result = await sql`SELECT id, job_id as "jobId", store_id as "storeId", status, reviewer_notes as "reviewerNotes", edited_payload as "editedPayload", decided_at as "decidedAt" FROM approvals WHERE job_id = ${jobId} ORDER BY decided_at DESC LIMIT 1`;
   return result[0];
 }
+
+export async function listApprovalsByJob(jobId: string) {
+  const sql = neon(process.env.DATABASE_URL!);
+  const result = await sql`SELECT id, job_id as "jobId", store_id as "storeId", status, reviewer_notes as "reviewerNotes", edited_payload as "editedPayload", decided_at as "decidedAt" FROM approvals WHERE job_id = ${jobId} ORDER BY decided_at ASC`;
+  return result;
+}

@@ -3,6 +3,6 @@ export async function createBrief({ storeId, keyword, research }: { storeId: str
     keyword,
     intent: 'informational commercial',
     sections: ['intro', 'key specs', 'comparison', 'faqs'],
-    researchSummary: research.summary,
+    researchSummary: research?.summary || '',
   };
 }

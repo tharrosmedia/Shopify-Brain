@@ -14,62 +14,82 @@ import { logEvent } from '../../lib/brain/events';
 export const seoCatalogPage = (inngest.createFunction as any)(
   { id: 'seo-catalog-page', retries: 2, triggers: { event: 'seo/catalog-page.requested' } },
   async ({ event, step }: any) => {
-    const { storeId, keyword } = event.data as { storeId: string; keyword: string };
+    if (!process.env.XAI_API_KEY) throw new Error('XAI_API_KEY is required');
+    if (!process.env.TAVILY_API_KEY) throw new Error('TAVILY_API_KEY is required');
 
-    const job = await step.run('create-job', () => createJob({ storeId, domain: 'seo', type: 'catalog_page', input: { keyword } }));
+    const data = event.data as { storeId: string; keyword: string; jobId?: string; job_id?: string };
+    const storeId = data.storeId;
+    const keyword = data.keyword;
+    const providedJobId = data.jobId || data.job_id;
+
+    let job;
+    if (providedJobId) {
+      job = { id: providedJobId };
+    } else {
+      job = await step.run('create-job', () => createJob({ storeId, domain: 'seo', type: 'catalog_page', input: { keyword } }));
+    }
     await step.run('log-start', () => logEvent(storeId, 'system', 'job.started', { keyword }, job.id));
 
-    const researchResult = await step.run('research', () => research({ storeId, keyword }));
+    try {
+      const researchResult = await step.run('research', () => research({ storeId, keyword }));
 
-    const brief = await step.run('brief', () => createBrief({ storeId, keyword, research: researchResult }));
+      const brief = await step.run('brief', () => createBrief({ storeId, keyword, research: researchResult }));
 
-    const draft = await step.run('write', () => writeDraft({ storeId, brief }));
+      const draft = await step.run('write', () => writeDraft({ storeId, brief }));
 
-    const edited = await step.run('edit', () => editDraft({ storeId, draft }));
+      const edited = await step.run('edit', () => editDraft({ storeId, draft }));
 
-    const optimized = await step.run('optimize', () => optimizeDraft({ storeId, draft: edited }));
+      const optimized = await step.run('optimize', () => optimizeDraft({ storeId, draft: edited }));
 
-    const scores = await step.run('evaluate', () => evaluate(optimized));
+      const scores = await step.run('evaluate', () => evaluate(optimized));
 
-    const draftRecord = await step.run('save-draft', () => saveDraft({
-      jobId: job.id,
-      storeId,
-      title: optimized.title,
-      handle: optimized.handle,
-      bodyHtml: optimized.bodyHtml,
-      metaTitle: optimized.metaTitle,
-      metaDescription: optimized.metaDescription,
-      evaluationScores: scores,
-      rawResearch: researchResult,
-    }));
+      const draftRecord = await step.run('save-draft', () => saveDraft({
+        jobId: job.id,
+        storeId,
+        title: optimized.title,
+        handle: optimized.handle,
+        bodyHtml: optimized.bodyHtml,
+        metaTitle: optimized.metaTitle,
+        metaDescription: optimized.metaDescription,
+        evaluationScores: scores,
+        rawResearch: researchResult,
+      }));
 
-    await step.run('update-job-awaiting', () => updateJobStatus(job.id, 'awaiting_approval'));
-    await step.run('log-awaiting', () => logEvent(storeId, 'system', 'job.awaiting_approval', {}, job.id));
+      await step.run('update-job-awaiting', () => updateJobStatus(job.id, 'awaiting_approval'));
+      await step.run('log-awaiting', () => logEvent(storeId, 'system', 'job.awaiting_approval', {}, job.id));
 
-    const approval = await step.waitForEvent('approval/decided', { timeout: '1d' });
-    const approvalData = (approval as any)?.data || {};
+      const approval = await step.waitForEvent('approval/decided', { timeout: '1d' });
+      const approvalData = (approval as any)?.data || {};
 
-    await step.run('save-approval', () => saveApproval({
-      jobId: job.id,
-      storeId,
-      status: approvalData.status,
-      reviewerNotes: approvalData.notes,
-      editedPayload: approvalData.editedPayload,
-    }));
-    await step.run('log-approval', () => logEvent(storeId, 'human', 'approval.' + approvalData.status, approvalData, job.id));
+      await step.run('save-approval', () => saveApproval({
+        jobId: job.id,
+        storeId,
+        status: approvalData.status,
+        reviewerNotes: approvalData.notes,
+        editedPayload: approvalData.editedPayload,
+      }));
+      await step.run('log-approval', () => logEvent(storeId, 'human', 'approval.' + approvalData.status, approvalData, job.id));
 
-    if (approvalData.status === 'rejected') {
-      await step.run('update-job-rejected', () => updateJobStatus(job.id, 'rejected'));
-      return { status: 'rejected' };
+      if (approvalData.status === 'rejected') {
+        await step.run('update-job-rejected', () => updateJobStatus(job.id, 'rejected'));
+        return { status: 'rejected' };
+      }
+
+      const finalDraft = approvalData.status === 'edited' && approvalData.editedPayload ? approvalData.editedPayload : optimized;
+
+      const result = await step.run('publish', () => publishCatalogPage({ storeId, draft: finalDraft }));
+
+      await step.run('update-job-completed', () => updateJobStatus(job.id, 'completed', result));
+      await step.run('log-completed', () => logEvent(storeId, 'system', 'job.completed', { shopify: result }, job.id));
+
+      return { status: 'completed', shopifyResult: result };
+    } catch (err: any) {
+      console.error('SEO catalog job failed', err);
+      if (job?.id) {
+        try { await updateJobStatus(job.id, 'failed'); } catch {}
+        try { await logEvent(storeId, 'system', 'job.failed', { error: err.message || String(err) }, job.id); } catch {}
+      }
+      throw err;
     }
-
-    const finalDraft = approvalData.status === 'edited' && approvalData.editedPayload ? approvalData.editedPayload : optimized;
-
-    const result = await step.run('publish', () => publishCatalogPage({ storeId, draft: finalDraft }));
-
-    await step.run('update-job-completed', () => updateJobStatus(job.id, 'completed', result));
-    await step.run('log-completed', () => logEvent(storeId, 'system', 'job.completed', { shopify: result }, job.id));
-
-    return { status: 'completed', shopifyResult: result };
   }
 );

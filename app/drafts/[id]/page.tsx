@@ -3,7 +3,7 @@ import { saveApproval } from '@/src/lib/db/approvals';
 import { updateJobStatus } from '@/src/lib/db/jobs';
 import { inngest } from '@/src/inngest/client';
 import Link from 'next/link';
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 
 async function decide(formData: FormData) {
@@ -31,9 +31,15 @@ async function decide(formData: FormData) {
 
   await inngest.send({ name: 'approval/decided', data: { status, notes, editedPayload, jobId, draftId } });
 
-  if (status !== 'edited') {
-    await updateJobStatus(jobId, status === 'approved' ? 'approved' : 'rejected');
-  }
+  // Update job status immediately for feedback (treat edited as approved for queue purposes)
+  const finalStatus = status === 'approved' || status === 'edited' ? 'approved' : 'rejected';
+  await updateJobStatus(jobId, finalStatus);
+
+  // Revalidate and redirect so user sees immediate change
+  const { revalidatePath } = await import('next/cache');
+  revalidatePath('/review');
+  revalidatePath('/');
+  redirect('/review?success=decision-submitted');
 }
 
 export const dynamic = 'force-dynamic';
@@ -64,6 +70,7 @@ export default async function DraftDetail({ params }: { params: Promise<{ id: st
       <Link href="/review" className="underline">← Back to Review</Link>
       <h1 className="text-2xl font-bold mt-4 mb-2">{draft.title}</h1>
       <p className="text-sm text-muted-foreground mb-4">Handle: {draft.handle} | Job: {draft.jobId}</p>
+      <p className="text-sm mb-4"><Link href={`/jobs/${draft.jobId}`} className="underline">View full job audit</Link></p>
 
       <div className="border p-4 mb-6">
         <h3 className="font-semibold mb-2">Preview</h3>

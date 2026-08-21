@@ -11,6 +11,13 @@ export default async function History() {
   if (!storeId || storeId === 'undefined') {
     const stores = await listStores();
     storeId = stores[0]?.id || '11111111-1111-1111-1111-111111111111';
+    if (stores[0]) {
+      cookieStore.set('activeStoreId', storeId, {
+        path: '/',
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+      });
+    }
   }
   let jobs: any[] = [];
   let loadError: string | null = null;
@@ -35,10 +42,11 @@ export default async function History() {
             <th className="p-2">Status</th>
             <th className="p-2">Created</th>
             <th className="p-2">Output</th>
+            <th className="p-2">Actions</th>
           </tr>
         </thead>
         <tbody>
-          {jobs.length === 0 && !loadError && <tr><td colSpan={5} className="p-4 text-center text-muted-foreground">No jobs yet.</td></tr>}
+          {jobs.length === 0 && !loadError && <tr><td colSpan={6} className="p-4 text-center text-muted-foreground">No jobs yet.</td></tr>}
           {jobs.map((j: any) => (
             <tr key={j.id} className="border-t">
               <td className="p-2 font-mono">{j.id.slice(0,8)}</td>
@@ -46,6 +54,7 @@ export default async function History() {
               <td className="p-2 text-center">{j.status}</td>
               <td className="p-2">{new Date(j.createdAt).toLocaleDateString()}</td>
               <td className="p-2 text-xs max-w-xs truncate">{j.output ? JSON.stringify(j.output).slice(0,100) : '-'}</td>
+              <td className="p-2"><Link href={`/jobs/${j.id}`} className="underline">View</Link></td>
             </tr>
           ))}
         </tbody>

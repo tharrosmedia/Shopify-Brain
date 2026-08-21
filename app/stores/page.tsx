@@ -22,8 +22,12 @@ async function testConnection(formData: FormData) {
         id
       }
     }`;
-    const result: any = await client.request(query);
-    redirect(`/stores?test=success&msg=${encodeURIComponent(`Connected to ${result.shop.name} (${result.shop.id})`)}`);
+    const response: any = await client.request(query);
+    const shop = response?.shop || response?.data?.shop || response;
+    if (!shop || !shop.name) {
+      throw new Error(`Unexpected Shopify response shape (check token/scopes/domain): ${JSON.stringify(response)}`);
+    }
+    redirect(`/stores?test=success&msg=${encodeURIComponent(`Connected to ${shop.name} (${shop.id})`)}`);
   } catch (e: any) {
     redirect(`/stores?test=error&msg=${encodeURIComponent(e.message || 'Connection failed')}`);
   }
@@ -37,7 +41,13 @@ async function addStore(formData: FormData) {
   if (!name || !shopify_domain || !shopify_access_token) {
     redirect(`/stores?add=error&msg=${encodeURIComponent('All fields required')}`);
   }
-  await createStore({ name, shopify_domain, shopify_access_token });
+  const newStore = await createStore({ name, shopify_domain, shopify_access_token });
+  const cookieStore = await cookies();
+  cookieStore.set('activeStoreId', newStore.id, {
+    path: '/',
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+  });
   revalidatePath('/stores');
   redirect('/stores?add=success');
 }
@@ -46,11 +56,15 @@ async function selectStore(formData: FormData) {
   'use server';
   const storeId = formData.get('storeId') as string;
   const cookieStore = await cookies();
-  cookieStore.set('activeStoreId', storeId, { path: '/' });
+  cookieStore.set('activeStoreId', storeId, {
+    path: '/',
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+  });
   redirect('/');
 }
 
-export default async function StoresPage({ searchParams }: { searchParams: Promise<{ test?: string; msg?: string; add?: string }> }) {
+export default async function StoresPage({ searchParams }: { searchParams: Promise<{ test?: string; msg?: string; add?: string; updated?: string }> }) {
   const params = await searchParams;
   let stores: any[] = [];
   let loadError: string | null = null;
@@ -70,13 +84,25 @@ export default async function StoresPage({ searchParams }: { searchParams: Promi
       {params.add === 'error' && <div className="mb-4 p-3 bg-red-100 text-red-700 rounded text-sm">Add error: {params.msg}</div>}
       {params.test === 'success' && <div className="mb-4 p-3 bg-green-100 text-green-700 rounded text-sm">{params.msg}</div>}
       {params.test === 'error' && <div className="mb-4 p-3 bg-red-100 text-red-700 rounded text-sm">Test failed: {params.msg}</div>}
+      {params.updated === '1' && <div className="mb-4 p-3 bg-green-100 text-green-700 rounded text-sm">Store updated.</div>}
 
       <div className="mb-8 border p-4 rounded">
         <h2 className="font-semibold mb-4">Add New Store</h2>
-        <form action={addStore} className="space-y-2">
-          <input name="name" placeholder="Store Name" className="border p-2 w-full" required />
-          <input name="shopify_domain" placeholder="your-store.myshopify.com" className="border p-2 w-full" required />
-          <input name="shopify_access_token" placeholder="shpat_..." type="password" className="border p-2 w-full" required />
+        <form action={addStore} className="space-y-3">
+          <div>
+            <label className="block text-sm font-medium mb-1">Store Name</label>
+            <input name="name" placeholder="My Store" className="border p-2 w-full" required />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">Shopify Domain</label>
+            <input name="shopify_domain" placeholder="your-store.myshopify.com" className="border p-2 w-full" required />
+            <p className="text-xs text-muted-foreground mt-1">Exact format, e.g. hvacusa.myshopify.com (no https://, no trailing slash)</p>
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">Shopify Access Token</label>
+            <input name="shopify_access_token" placeholder="shpat_..." type="password" className="border p-2 w-full" required />
+            <p className="text-xs text-muted-foreground mt-1">Admin API token (starts with shpat_). Create at Shopify Admin → Settings → Apps and sales channels → Develop apps. Grant read_products + write_collections at minimum.</p>
+          </div>
           <Button type="submit">Add Store</Button>
         </form>
       </div>
@@ -115,7 +141,7 @@ export default async function StoresPage({ searchParams }: { searchParams: Promi
       </table>
 
       <p className="mt-4 text-sm text-muted-foreground">
-        After adding stores, use the selector in the header to switch between them. (Edit coming soon)
+        After adding, the new store is auto-selected. Use the header selector to switch stores. New stores will appear in the dashboard immediately.
       </p>
     </div>
   );

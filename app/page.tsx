@@ -11,12 +11,24 @@ async function triggerJob(formData: FormData) {
   const keyword = formData.get('keyword') as string;
   if (!keyword) return;
   const cookieStore = await cookies();
-  const storeId = cookieStore.get('activeStoreId')?.value || process.env.DEV_STORE_ID || '11111111-1111-1111-1111-111111111111';
+  let storeId = cookieStore.get('activeStoreId')?.value || process.env.DEV_STORE_ID || '11111111-1111-1111-1111-111111111111';
+  if (!storeId || storeId === 'undefined') {
+    const stores = await listStores();
+    storeId = stores[0]?.id || '11111111-1111-1111-1111-111111111111';
+  }
+  const c = await cookies();
+  c.set('activeStoreId', storeId, {
+    path: '/',
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+  });
   const job = await createJob({ storeId, domain: 'seo', type: 'catalog_page', input: { keyword } });
   await inngest.send({
     name: 'seo/catalog-page.requested',
     data: { storeId, keyword, jobId: job.id },
   });
+  const { revalidatePath } = await import('next/cache');
+  revalidatePath('/');
 }
 
 export const dynamic = 'force-dynamic';
@@ -24,9 +36,17 @@ export const dynamic = 'force-dynamic';
 export default async function Dashboard() {
   const cookieStore = await cookies();
   let storeId = cookieStore.get('activeStoreId')?.value || process.env.DEV_STORE_ID || '11111111-1111-1111-1111-111111111111';
+  const allStores = await listStores();
   if (!storeId || storeId === 'undefined') {
-    const stores = await listStores();
-    storeId = stores[0]?.id || '11111111-1111-1111-1111-111111111111';
+    storeId = allStores[0]?.id || '11111111-1111-1111-1111-111111111111';
+    if (allStores[0]) {
+      const c = await cookies();
+      c.set('activeStoreId', storeId, {
+        path: '/',
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+      });
+    }
   }
   let jobs: any[] = [];
   let loadError: string | null = null;
@@ -42,6 +62,14 @@ export default async function Dashboard() {
   return (
     <div className="p-8 max-w-6xl mx-auto">
       <h1 className="text-3xl font-bold mb-8">Shopify Brain - cerevex.store</h1>
+
+      {allStores.length === 0 && (
+        <div className="mb-6 p-4 border border-blue-200 bg-blue-50 rounded">
+          <p className="font-semibold mb-2">Welcome! Get started by adding your Shopify store.</p>
+          <Link href="/stores" className="inline-block bg-black text-white px-4 py-2 rounded text-sm">Go to Store Management →</Link>
+          <p className="text-sm mt-2 text-muted-foreground">Once added, it will be auto-selected and you can trigger SEO jobs.</p>
+        </div>
+      )}
 
       {loadError && (
         <div className="mb-4 p-3 bg-red-100 text-red-700 rounded text-sm">
@@ -95,7 +123,7 @@ export default async function Dashboard() {
                 <td className="p-2">{job.status}</td>
                 <td className="p-2 text-sm">{new Date(job.createdAt).toLocaleString()}</td>
                 <td className="p-2">
-                  <Link href={`/review`} className="underline">View</Link>
+                  <Link href={`/jobs/${job.id}`} className="underline">View</Link>
                 </td>
               </tr>
             ))}
