@@ -30,20 +30,22 @@ export const seoCatalogPage = (inngest.createFunction as any)(
     }
     await step.run('log-start', () => logEvent(storeId, 'system', 'job.started', { keyword }, job.id));
 
+    let researchResult: any, brief: any, draft: any, edited: any, optimized: any, scores: any, draftRecord: any;
+
     try {
-      const researchResult = await step.run('research', () => research({ storeId, keyword }));
+      researchResult = await step.run('research', () => research({ storeId, keyword }));
 
-      const brief = await step.run('brief', () => createBrief({ storeId, keyword, research: researchResult }));
+      brief = await step.run('brief', () => createBrief({ storeId, keyword, research: researchResult }));
 
-      const draft = await step.run('write', () => writeDraft({ storeId, brief }));
+      draft = await step.run('write', () => writeDraft({ storeId, brief }));
 
-      const edited = await step.run('edit', () => editDraft({ storeId, draft }));
+      edited = await step.run('edit', () => editDraft({ storeId, draft }));
 
-      const optimized = await step.run('optimize', () => optimizeDraft({ storeId, draft: edited }));
+      optimized = await step.run('optimize', () => optimizeDraft({ storeId, draft: edited }));
 
-      const scores = await step.run('evaluate', () => evaluate(optimized));
+      scores = await step.run('evaluate', () => evaluate(optimized));
 
-      const draftRecord = await step.run('save-draft', () => saveDraft({
+      draftRecord = await step.run('save-draft', () => saveDraft({
         jobId: job.id,
         storeId,
         title: optimized.title,
@@ -57,10 +59,27 @@ export const seoCatalogPage = (inngest.createFunction as any)(
 
       await step.run('update-job-awaiting', () => updateJobStatus(job.id, 'awaiting_approval'));
       await step.run('log-awaiting', () => logEvent(storeId, 'system', 'job.awaiting_approval', {}, job.id));
+    } catch (err: any) {
+      console.error('SEO catalog job failed', err);
+      if (job?.id) {
+        try { await updateJobStatus(job.id, 'failed'); } catch {}
+        try { await logEvent(storeId, 'system', 'job.failed', { error: err.message || String(err) }, job.id); } catch {}
+      }
+      throw err;
+    }
 
-      const approval = await step.waitForEvent('approval/decided', { timeout: '1d' });
-      const approvalData = (approval as any)?.data || {};
+    const approval = await step.waitForEvent('approval/decided', { timeout: '1d' });
+    const approvalData = (approval as any)?.data || {};
 
+    if (!approval || !approvalData.status) {
+      await step.run('log-timeout', () => logEvent(storeId, 'system', 'job.timeout', {}, job.id));
+      if (job?.id) {
+        try { await updateJobStatus(job.id, 'failed'); } catch {}
+      }
+      return { status: 'no-decision' };
+    }
+
+    try {
       await step.run('save-approval', () => saveApproval({
         jobId: job.id,
         storeId,
