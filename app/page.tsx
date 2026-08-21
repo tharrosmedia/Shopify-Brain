@@ -3,12 +3,15 @@ import { inngest } from '@/src/inngest/client';
 import { listJobs } from '@/src/lib/db/jobs';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
+import { cookies } from 'next/headers';
+import { listStores } from '@/src/lib/db/stores';
 
 async function triggerJob(formData: FormData) {
   'use server';
   const keyword = formData.get('keyword') as string;
   if (!keyword) return;
-  const storeId = process.env.DEV_STORE_ID || '11111111-1111-1111-1111-111111111111';
+  const cookieStore = await cookies();
+  const storeId = cookieStore.get('activeStoreId')?.value || process.env.DEV_STORE_ID || '11111111-1111-1111-1111-111111111111';
   const job = await createJob({ storeId, domain: 'seo', type: 'catalog_page', input: { keyword } });
   await inngest.send({
     name: 'seo/catalog-page.requested',
@@ -19,8 +22,19 @@ async function triggerJob(formData: FormData) {
 export const dynamic = 'force-dynamic';
 
 export default async function Dashboard() {
-  const storeId = process.env.DEV_STORE_ID || '11111111-1111-1111-1111-111111111111';
-  const jobs = await listJobs(storeId, 20);
+  const cookieStore = await cookies();
+  let storeId = cookieStore.get('activeStoreId')?.value || process.env.DEV_STORE_ID || '11111111-1111-1111-1111-111111111111';
+  if (!storeId || storeId === 'undefined') {
+    const stores = await listStores();
+    storeId = stores[0]?.id || '11111111-1111-1111-1111-111111111111';
+  }
+  let jobs: any[] = [];
+  let loadError: string | null = null;
+  try {
+    jobs = await listJobs(storeId, 20);
+  } catch (e: any) {
+    loadError = e.message || 'Failed to load jobs';
+  }
 
   const pending = jobs.filter((j: any) => j.status === 'awaiting_approval').length;
   const completed = jobs.filter((j: any) => j.status === 'completed').length;
@@ -28,6 +42,12 @@ export default async function Dashboard() {
   return (
     <div className="p-8 max-w-6xl mx-auto">
       <h1 className="text-3xl font-bold mb-8">Shopify Brain - cerevex.store</h1>
+
+      {loadError && (
+        <div className="mb-4 p-3 bg-red-100 text-red-700 rounded text-sm">
+          Error loading data: {loadError}. Make sure DATABASE_URL is set and migration has run.
+        </div>
+      )}
 
       <div className="grid grid-cols-3 gap-4 mb-8">
         <div className="border p-4 rounded">
@@ -65,6 +85,9 @@ export default async function Dashboard() {
             </tr>
           </thead>
           <tbody>
+            {jobs.length === 0 && !loadError && (
+              <tr><td colSpan={5} className="p-4 text-center text-muted-foreground">No jobs yet for this store.</td></tr>
+            )}
             {jobs.map((job: any) => (
               <tr key={job.id} className="border-t">
                 <td className="p-2 font-mono text-xs">{job.id.slice(0, 8)}</td>
@@ -72,7 +95,7 @@ export default async function Dashboard() {
                 <td className="p-2">{job.status}</td>
                 <td className="p-2 text-sm">{new Date(job.createdAt).toLocaleString()}</td>
                 <td className="p-2">
-                  <Link href={`/drafts?jobId=${job.id}`} className="underline">View</Link>
+                  <Link href={`/review`} className="underline">View</Link>
                 </td>
               </tr>
             ))}

@@ -1,10 +1,13 @@
 import { createAdminClient } from '../../shopify/client';
 import { createDraftCollection } from '../../shopify/collections';
+import { getStore } from '../../db/stores';
 
 export async function publishCatalogPage({ storeId, draft }: { storeId: string; draft: any }) {
-  const domain = process.env.SHOPIFY_STORE_DOMAIN!;
-  const token = process.env.SHOPIFY_ACCESS_TOKEN!;
-  const client = createAdminClient(domain, token);
+  const store = await getStore(storeId);
+  if (!store || !store.shopify_access_token) {
+    throw new Error(`No Shopify credentials configured for store ${storeId}`);
+  }
+  const client = createAdminClient(store.shopify_domain, store.shopify_access_token);
   return createDraftCollection(client, {
     title: draft.title,
     handle: draft.handle,

@@ -1,16 +1,31 @@
 import { listJobs } from '@/src/lib/db/jobs';
 import Link from 'next/link';
+import { cookies } from 'next/headers';
+import { listStores } from '@/src/lib/db/stores';
 
 export const dynamic = 'force-dynamic';
 
 export default async function History() {
-  const storeId = process.env.DEV_STORE_ID || '11111111-1111-1111-1111-111111111111';
-  const jobs = await listJobs(storeId, 50);
+  const cookieStore = await cookies();
+  let storeId = cookieStore.get('activeStoreId')?.value || process.env.DEV_STORE_ID || '11111111-1111-1111-1111-111111111111';
+  if (!storeId || storeId === 'undefined') {
+    const stores = await listStores();
+    storeId = stores[0]?.id || '11111111-1111-1111-1111-111111111111';
+  }
+  let jobs: any[] = [];
+  let loadError: string | null = null;
+  try {
+    jobs = await listJobs(storeId, 50);
+  } catch (e: any) {
+    loadError = e.message || 'Failed to load history';
+  }
 
   return (
     <div className="p-8 max-w-6xl mx-auto">
       <Link href="/" className="underline">← Dashboard</Link>
       <h1 className="text-2xl font-bold my-6">Job History</h1>
+
+      {loadError && <div className="mb-4 p-3 bg-red-100 text-red-700 rounded text-sm">Error: {loadError}</div>}
 
       <table className="w-full border text-sm">
         <thead>
@@ -23,6 +38,7 @@ export default async function History() {
           </tr>
         </thead>
         <tbody>
+          {jobs.length === 0 && !loadError && <tr><td colSpan={5} className="p-4 text-center text-muted-foreground">No jobs yet.</td></tr>}
           {jobs.map((j: any) => (
             <tr key={j.id} className="border-t">
               <td className="p-2 font-mono">{j.id.slice(0,8)}</td>

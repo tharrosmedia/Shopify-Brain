@@ -4,6 +4,7 @@ import { updateJobStatus } from '@/src/lib/db/jobs';
 import { inngest } from '@/src/inngest/client';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import { cookies } from 'next/headers';
 
 async function decide(formData: FormData) {
   'use server';
@@ -11,7 +12,9 @@ async function decide(formData: FormData) {
   const status = formData.get('status') as string;
   const notes = formData.get('notes') as string || '';
   const jobId = formData.get('jobId') as string;
-  const storeId = process.env.DEV_STORE_ID || '11111111-1111-1111-1111-111111111111';
+  const cookieStore = await cookies();
+  let storeId = cookieStore.get('activeStoreId')?.value || process.env.DEV_STORE_ID || '11111111-1111-1111-1111-111111111111';
+  if (!storeId || storeId === 'undefined') storeId = '11111111-1111-1111-1111-111111111111';
 
   let editedPayload: any = undefined;
   if (status === 'edited') {
@@ -37,7 +40,23 @@ export const dynamic = 'force-dynamic';
 
 export default async function DraftDetail({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const draft = await getDraft(id);
+  let draft: any = null;
+  let loadError: string | null = null;
+  try {
+    draft = await getDraft(id);
+  } catch (e: any) {
+    loadError = e.message || 'Failed to load draft';
+  }
+  if (!draft && !loadError) notFound();
+
+  if (loadError) {
+    return (
+      <div className="p-8 max-w-4xl mx-auto">
+        <Link href="/review" className="underline">← Back to Review</Link>
+        <div className="mt-4 p-3 bg-red-100 text-red-700 rounded">Error: {loadError}</div>
+      </div>
+    );
+  }
   if (!draft) notFound();
 
   return (
