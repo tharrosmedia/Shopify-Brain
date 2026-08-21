@@ -1,0 +1,14 @@
+body {
+  font-family: system-ui, sans-serif;
+  margin: 0;
+  padding: 0;
+  background: #fff;
+  color: #111;
+}
+
+h1 { font-size: 1.5rem; }
+table { border-collapse: collapse; width: 100%; }
+th, td { padding: 8px; border: 1px solid #ddd; text-align: left; }
+input, textarea, select, button { padding: 8px; border: 1px solid #ccc; }
+button { background: #000; color: #fff; cursor: pointer; }
+a { color: #0066cc; }
