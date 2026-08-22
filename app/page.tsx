@@ -1,4 +1,4 @@
-import { createJob } from '@/src/lib/db/jobs';
+import { createJob, updateJobStatus } from '@/src/lib/db/jobs';
 import { inngest } from '@/src/inngest/client';
 import { listJobs } from '@/src/lib/db/jobs';
 import Link from 'next/link';
@@ -23,11 +23,19 @@ async function triggerJob(formData: FormData) {
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
   });
-  const job = await createJob({ storeId, domain: 'seo', type, input: { keyword } });
-  await inngest.send({
-    name: 'seo/job.requested',
-    data: { storeId, keyword, type, jobId: job.id },
-  });
+  const job = await createJob({ storeId, domain: 'seo', type, input: { keyword }, status: 'queued' });
+  try {
+    await inngest.send({
+      name: 'seo/job.requested',
+      data: { storeId, keyword, type, jobId: job.id },
+    });
+  } catch (e: any) {
+    console.error('Failed to send to Inngest', e);
+    await updateJobStatus(job.id, 'failed');
+    const { revalidatePath } = await import('next/cache');
+    revalidatePath('/');
+    throw new Error(`Failed to queue job for Inngest: ${e.message || e}`);
+  }
   const { revalidatePath } = await import('next/cache');
   revalidatePath('/');
 }

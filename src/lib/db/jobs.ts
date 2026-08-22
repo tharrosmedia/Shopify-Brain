@@ -1,9 +1,9 @@
 import { neon } from '@neondatabase/serverless';
 import 'dotenv/config';
 
-export async function createJob({ storeId, domain, type, input }: { storeId: string; domain: string; type: string; input: any }) {
+export async function createJob({ storeId, domain, type, input, status = 'running' }: { storeId: string; domain: string; type: string; input: any; status?: string }) {
   const sql = neon(process.env.DATABASE_URL!);
-  const result = await sql`INSERT INTO jobs (store_id, domain, type, status, input) VALUES (${storeId}, ${domain}, ${type}, 'running', ${input}) RETURNING id, store_id as "storeId", domain, type, status, input, output, created_at as "createdAt"`;
+  const result = await sql`INSERT INTO jobs (store_id, domain, type, status, input) VALUES (${storeId}, ${domain}, ${type}, ${status}, ${input}) RETURNING id, store_id as "storeId", domain, type, status, input, output, created_at as "createdAt"`;
   return result[0];
 }
 

@@ -11,28 +11,54 @@ import { updateJobStatusFn } from '../update-job-status';
 import { logEventFn } from '../log-event';
 import { saveApprovalFn } from './save-approval';
 import { publishFn } from './publish';
+import { updateJobStatus } from '../../../lib/db/jobs';
+import { logEvent } from '../../../lib/brain/events';
 
 export const seoJob = inngest.createFunction(
   { id: 'seo-job', retries: 2, triggers: [{ event: 'seo/job.requested' }] },
   async ({ event, step }: any) => {
-    if (!process.env.XAI_API_KEY) throw new Error('XAI_API_KEY is required');
-    if (!process.env.TAVILY_API_KEY) throw new Error('TAVILY_API_KEY is required');
-
     const data = event.data as { storeId: string; keyword: string; jobId?: string; job_id?: string; type?: string };
     const storeId = data.storeId;
     const keyword = data.keyword;
     const type = data.type || 'collection';
     const providedJobId = data.jobId || data.job_id;
+    const jobId = providedJobId || 'unknown';
 
-    let job = await step.invoke('ensure-job', {
-      function: ensureJob,
-      data: { storeId, keyword, type, jobId: providedJobId },
-    });
+    // Early direct update + log so we always see activity even if later steps fail or keys missing
+    try {
+      await updateJobStatus(jobId, 'running');
+      await logEvent(storeId, 'system', 'job.started', { keyword, type }, jobId);
+    } catch (e) {
+      console.error('Failed early job start log', e);
+    }
 
-    await step.invoke('log-start', {
-      function: logEventFn,
-      data: { storeId, actor: 'system', action: 'job.started', payload: { keyword, type }, jobId: job.id },
-    });
+    if (!process.env.XAI_API_KEY) {
+      await updateJobStatus(jobId, 'failed');
+      await logEvent(storeId, 'system', 'job.failed', { error: 'XAI_API_KEY is required' }, jobId);
+      throw new Error('XAI_API_KEY is required');
+    }
+    if (!process.env.TAVILY_API_KEY) {
+      await updateJobStatus(jobId, 'failed');
+      await logEvent(storeId, 'system', 'job.failed', { error: 'TAVILY_API_KEY is required' }, jobId);
+      throw new Error('TAVILY_API_KEY is required');
+    }
+
+    let job: any;
+    try {
+      job = await step.invoke('ensure-job', {
+        function: ensureJob,
+        data: { storeId, keyword, type, jobId: providedJobId },
+      });
+    } catch (err: any) {
+      console.error('SEO job failed at ensure', err);
+      if (jobId && jobId !== 'unknown') {
+        try { await updateJobStatus(jobId, 'failed'); } catch {}
+        try { await logEvent(storeId, 'system', 'job.failed', { error: err.message || String(err) }, jobId); } catch {}
+      }
+      throw err;
+    }
+
+    // Note: log-start already done directly above for visibility
 
     let researchResult: any, brief: any, draft: any, edited: any, optimized: any, scores: any, draftRecord: any;
 
