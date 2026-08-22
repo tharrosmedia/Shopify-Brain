@@ -12,7 +12,8 @@
     "db:migrate": "tsx scripts/migrate.ts",
     "trigger:seo": "tsx scripts/trigger-seo.ts",
     "test:shopify": "tsx scripts/test-shopify.ts",
-    "inngest:sync": "tsx scripts/sync-inngest.ts"
+    "inngest:sync": "tsx scripts/sync-inngest.ts",
+    "test:prompt": "tsx scripts/test-prompt.ts"
   },
   "keywords": [],
   "author": "",

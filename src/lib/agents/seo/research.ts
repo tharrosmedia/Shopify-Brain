@@ -1,7 +1,6 @@
 import { generateText } from 'ai';
-import { createOpenAI } from '@ai-sdk/openai';
-
-const xai = createOpenAI({ baseURL: 'https://api.x.ai/v1', apiKey: process.env.XAI_API_KEY! });
+import { xai, XAI_MODEL } from '../../ai/xai';
+import { buildResearchMessages } from '../../prompts/seo/research';
 
 export async function research({ storeId, keyword, type = 'collection' }: { storeId: string; keyword: string; type?: string }) {
   const tavilyRes = await fetch('https://api.tavily.com/search', {
@@ -15,9 +14,13 @@ export async function research({ storeId, keyword, type = 'collection' }: { stor
     }),
   });
   const data = await tavilyRes.json();
+  const allMsgs = buildResearchMessages({ keyword, type, searchData: data });
+  const sys = allMsgs.find(m => m.role === 'system')?.content;
+  const userMsgs = allMsgs.filter(m => m.role !== 'system');
   const { text } = await generateText({
-    model: xai('grok-build-0.1'),
-    prompt: `Summarize key facts, competitors, questions and angles for a Shopify ${type} about: ${keyword}. Use this search data: ${JSON.stringify(data).slice(0, 2000)}`,
+    model: xai(XAI_MODEL),
+    system: sys,
+    messages: userMsgs,
   });
   return { keyword, summary: text, raw: data, type };
 }

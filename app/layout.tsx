@@ -45,11 +45,12 @@ export default async function RootLayout({
           <div className="max-w-6xl mx-auto flex items-center justify-between">
             <div className="flex items-center gap-4">
               <Link href="/" className="font-bold text-xl">Shopify Brain</Link>
-              <nav className="flex gap-4 text-sm">
-                <Link href="/stores" className="underline">Stores</Link>
-                <Link href="/review" className="underline">Review</Link>
-                <Link href="/history" className="underline">History</Link>
-              </nav>
+               <nav className="flex gap-4 text-sm">
+                 <Link href="/stores" className="underline">Stores</Link>
+                 <Link href="/review" className="underline">Review</Link>
+                 <Link href="/history" className="underline">History</Link>
+                 <Link href="/settings" className="underline">Settings</Link>
+               </nav>
             </div>
             {stores.length > 0 && (
               <form action={setActiveStore} className="flex items-center gap-2">

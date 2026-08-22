@@ -1,12 +1,15 @@
 import { generateText } from 'ai';
-import { createOpenAI } from '@ai-sdk/openai';
-
-const xai = createOpenAI({ baseURL: 'https://api.x.ai/v1', apiKey: process.env.XAI_API_KEY! });
+import { xai, XAI_MODEL } from '../../ai/xai';
+import { buildWriterMessages } from '../../prompts/seo/writer';
 
 export async function writeDraft({ storeId, brief, type = 'collection' }: { storeId: string; brief: any; type?: string }) {
+  const allMsgs = buildWriterMessages({ brief, type });
+  const sys = allMsgs.find(m => m.role === 'system')?.content;
+  const userMsgs = allMsgs.filter(m => m.role !== 'system');
   const { text } = await generateText({
-    model: xai('grok-build-0.1'),
-    prompt: `Write a high quality answer-first HTML content for a Shopify ${type} about keyword "${brief.keyword}". Use this brief: ${JSON.stringify(brief)}. Include H2 sections, tables if useful, FAQs. Return only the inner HTML body content.`,
+    model: xai(XAI_MODEL),
+    system: sys,
+    messages: userMsgs,
   });
   let cleaned = (text || '').trim();
   // Strip common LLM markdown code fences for HTML
