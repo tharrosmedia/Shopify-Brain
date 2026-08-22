@@ -1,12 +1,32 @@
 import 'dotenv/config';
 
-const eventKey = process.env.INNGEST_EVENT_KEY;
-const signingKey = process.env.INNGEST_SIGNING_KEY;
-const url = process.env.PUBLIC_URL || 'https://cerevex.store/api/inngest';
+const apiKey = process.env.INNGEST_API_KEY;
+const appId = 'shopify-brain';
+const handlerUrl = process.env.PUBLIC_URL || 'https://cerevex.store/api/inngest';
 
-if (!eventKey || !signingKey) {
-  console.log('Set INNGEST_EVENT_KEY and INNGEST_SIGNING_KEY in env');
+if (!apiKey) {
+  console.error('INNGEST_API_KEY is required (create a management key in Inngest dashboard)');
+  process.exit(1);
 }
-console.log('Sync command:');
-console.log(`INNGEST_EVENT_KEY=${eventKey || 'xxx'} INNGEST_SIGNING_KEY=${signingKey || 'xxx'} npx inngest-cli@latest sync --url ${url}`);
-console.log('Or use dashboard sync to', url);
+
+console.log('[INNGEST] syncing app', appId, 'to', handlerUrl);
+
+const res = await fetch(`https://api.inngest.com/v2/apps/${appId}/syncs`, {
+  method: 'POST',
+  headers: {
+    'Authorization': `Bearer ${apiKey}`,
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({ url: handlerUrl }),
+});
+
+const text = await res.text();
+console.log('Status:', res.status);
+console.log('Response:', text);
+
+if (!res.ok) {
+  console.error('Sync failed');
+  process.exit(1);
+}
+
+console.log('Sync completed successfully');

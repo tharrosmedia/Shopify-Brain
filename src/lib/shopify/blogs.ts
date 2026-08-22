@@ -20,7 +20,9 @@ export async function getFirstBlogId(adminClient: any): Promise<string> {
   return blog.id;
 }
 
-export async function createDraftArticle(adminClient: any, input: { title: string; handle?: string; bodyHtml?: string }) {
+import { getOnlineStorePublicationId, publishResource } from './publications';
+
+export async function createAndPublishArticle(adminClient: any, input: { title: string; handle?: string; bodyHtml?: string }) {
   const blogId = await getFirstBlogId(adminClient);
   const mutation = `
     mutation createArticle($article: ArticleInput!, $blog: ArticleBlogInput!) {
@@ -41,5 +43,18 @@ export async function createDraftArticle(adminClient: any, input: { title: strin
     },
   };
   const response = await adminClient.request(mutation, { variables });
+  const errors = response?.data?.articleCreate?.userErrors || [];
+  if (errors.length) {
+    throw new Error(errors.map((e: any) => e.message).join('; '));
+  }
+  const article = response?.data?.articleCreate?.article;
+  if (!article?.id) {
+    throw new Error('Failed to create article');
+  }
+  const pubId = await getOnlineStorePublicationId(adminClient);
+  await publishResource(adminClient, article.id, pubId);
   return response;
 }
+
+// Back-compat alias
+export const createDraftArticle = createAndPublishArticle;

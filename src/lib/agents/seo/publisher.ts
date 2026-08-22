@@ -1,7 +1,7 @@
 import { createAdminClient } from '../../shopify/client';
-import { createDraftCollection } from '../../shopify/collections';
-import { createDraftPage } from '../../shopify/pages';
-import { createDraftArticle } from '../../shopify/blogs';
+import { createAndPublishCollection } from '../../shopify/collections';
+import { createAndPublishPage } from '../../shopify/pages';
+import { createAndPublishArticle } from '../../shopify/blogs';
 import { getStore } from '../../db/stores';
 
 export async function publishContent({ storeId, draft, type = 'collection' }: { storeId: string; draft: any; type?: string }) {
@@ -11,21 +11,21 @@ export async function publishContent({ storeId, draft, type = 'collection' }: { 
   }
   const client = createAdminClient(store.shopify_domain, store.shopify_access_token);
   if (type === 'page') {
-    return createDraftPage(client, {
+    return createAndPublishPage(client, {
       title: draft.title,
       handle: draft.handle,
       bodyHtml: draft.bodyHtml,
     });
   }
   if (type === 'blog') {
-    return createDraftArticle(client, {
+    return createAndPublishArticle(client, {
       title: draft.title,
       handle: draft.handle,
       bodyHtml: draft.bodyHtml,
     });
   }
   // default collection
-  return createDraftCollection(client, {
+  return createAndPublishCollection(client, {
     title: draft.title,
     handle: draft.handle,
     bodyHtml: draft.bodyHtml,

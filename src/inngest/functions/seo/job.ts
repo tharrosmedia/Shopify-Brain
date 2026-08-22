@@ -170,9 +170,10 @@ export const seoJob = inngest.createFunction(
       throw err;
     }
 
-    const approval = await step.waitForEvent('approval/decided', {
+    const approval = await step.waitForEvent('wait-for-approval', {
+      event: 'approval/decided',
       timeout: '1d',
-      if: `event.data.jobId == "${job.id}"`,
+      match: 'data.jobId',
     });
     const approvalData = (approval as any)?.data || {};
 

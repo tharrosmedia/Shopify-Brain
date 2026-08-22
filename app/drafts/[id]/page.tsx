@@ -1,5 +1,4 @@
 import { getDraft } from '@/src/lib/db/drafts';
-import { saveApproval } from '@/src/lib/db/approvals';
 import { updateJobStatus } from '@/src/lib/db/jobs';
 import { inngest } from '@/src/inngest/client';
 import Link from 'next/link';
@@ -26,8 +25,6 @@ async function decide(formData: FormData) {
       metaDescription: formData.get('metaDescription'),
     };
   }
-
-  await saveApproval({ jobId, storeId, status, reviewerNotes: notes, editedPayload });
 
   console.log('[INNGEST] sending approval/decided', { jobId, status });
   try {

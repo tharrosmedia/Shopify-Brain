@@ -3,9 +3,9 @@
 **Store Brain** — a modular AI agent system that manages every major aspect of one or more Shopify stores.
 
 ## Vision
-Build a shared per-store "Brain" with specialized agent teams (SEO & Content first). Agents use tools (Shopify Admin GraphQL + external APIs). High-stakes actions require human approval by default. After approval, agents execute (create draft Collections, etc.). Same codebase supports single-store today and multi-store tomorrow via `store_id`.
+Build a shared per-store "Brain" with specialized agent teams (SEO & Content first). Agents use tools (Shopify Admin GraphQL + external APIs). High-stakes actions require human approval by default. After approval, agents execute (create + publish live content, etc.). Same codebase supports single-store today and multi-store tomorrow via `store_id`.
 
-Success for Stage A: trigger SEO job for a keyword → research → draft → human approve → publish as draft Collection in Shopify. Everything scoped by `store_id`.
+Success for Stage A: trigger SEO job for a keyword → research → draft → human approve → create + publish live Collection/Page/Blog in Shopify. Everything scoped by `store_id`.
 
 ## Tech Stack (Limited & Explicit)
 | Layer              | Choice                                      |

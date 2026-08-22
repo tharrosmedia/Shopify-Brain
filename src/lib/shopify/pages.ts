@@ -1,4 +1,6 @@
-export async function createDraftPage(adminClient: any, input: { title: string; handle?: string; bodyHtml?: string }) {
+import { getOnlineStorePublicationId, publishResource } from './publications';
+
+export async function createAndPublishPage(adminClient: any, input: { title: string; handle?: string; bodyHtml?: string }) {
   const mutation = `
     mutation createPage($input: PageInput!) {
       pageCreate(input: $input) {
@@ -15,5 +17,18 @@ export async function createDraftPage(adminClient: any, input: { title: string; 
     },
   };
   const response = await adminClient.request(mutation, { variables });
+  const errors = response?.data?.pageCreate?.userErrors || [];
+  if (errors.length) {
+    throw new Error(errors.map((e: any) => e.message).join('; '));
+  }
+  const page = response?.data?.pageCreate?.page;
+  if (!page?.id) {
+    throw new Error('Failed to create page');
+  }
+  const pubId = await getOnlineStorePublicationId(adminClient);
+  await publishResource(adminClient, page.id, pubId);
   return response;
 }
+
+// Back-compat alias
+export const createDraftPage = createAndPublishPage;

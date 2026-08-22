@@ -42,9 +42,38 @@ async function triggerJob(formData: FormData) {
   revalidatePath('/');
 }
 
+async function resyncInngest() {
+  'use server';
+  const apiKey = process.env.INNGEST_API_KEY;
+  const appId = 'shopify-brain';
+  const handlerUrl = process.env.PUBLIC_URL || 'https://cerevex.store/api/inngest';
+  const { revalidatePath } = await import('next/cache');
+  const { redirect } = await import('next/navigation');
+  revalidatePath('/');
+  if (!apiKey) {
+    redirect('/?resync=error');
+  }
+  try {
+    const res = await fetch(`https://api.inngest.com/v2/apps/${appId}/syncs`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url: handlerUrl }),
+    });
+    revalidatePath('/');
+    if (!res.ok) {
+      redirect('/?resync=error');
+    }
+    redirect('/?resync=success');
+  } catch {
+    revalidatePath('/');
+    redirect('/?resync=error');
+  }
+}
+
 export const dynamic = 'force-dynamic';
 
-export default async function Dashboard() {
+export default async function Dashboard({ searchParams }: { searchParams?: Promise<{ resync?: string }> }) {
+  const params = await (searchParams || Promise.resolve({})) as { resync?: string };
   const cookieStore = await cookies();
   let storeId = cookieStore.get('activeStoreId')?.value || process.env.DEV_STORE_ID || '11111111-1111-1111-1111-111111111111';
   const allStores = await listStores();
@@ -88,6 +117,13 @@ export default async function Dashboard() {
         </div>
       )}
 
+      {params.resync === 'success' && (
+        <div className="mb-4 p-3 bg-green-100 text-green-700 rounded text-sm">Inngest resync successful.</div>
+      )}
+      {params.resync === 'error' && (
+        <div className="mb-4 p-3 bg-red-100 text-red-700 rounded text-sm">Inngest resync failed. Check API key and PUBLIC_URL.</div>
+      )}
+
       <div className="grid grid-cols-3 gap-4 mb-8">
         <div className="border p-4 rounded">
           <div className="text-sm text-muted-foreground">Pending Review</div>
@@ -114,6 +150,13 @@ export default async function Dashboard() {
           </select>
           <Button type="submit">Trigger</Button>
         </form>
+
+        <div className="mt-3 pt-3 border-t">
+          <form action={resyncInngest} className="inline">
+            <Button type="submit" variant="outline" className="text-sm">Resync Inngest</Button>
+          </form>
+          <span className="ml-2 text-xs text-muted-foreground">Force function sync (uses PUBLIC_URL + INNGEST_API_KEY)</span>
+        </div>
       </div>
 
       <div>
