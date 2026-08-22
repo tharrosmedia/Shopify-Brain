@@ -24,22 +24,25 @@ export const seoJob = inngest.createFunction(
     const providedJobId = data.jobId || data.job_id;
     const jobId = providedJobId || 'unknown';
 
-    // Early direct update + log so we always see activity even if later steps fail or keys missing
-    try {
+    console.log('[INNGEST] seo-job handler started', { jobId, type, eventData: event.data });
+
+    await step.run('start-job', async () => {
       await updateJobStatus(jobId, 'running');
       await logEvent(storeId, 'system', 'job.started', { keyword, type }, jobId);
-    } catch (e) {
-      console.error('Failed early job start log', e);
-    }
+    });
 
     if (!process.env.XAI_API_KEY) {
-      await updateJobStatus(jobId, 'failed');
-      await logEvent(storeId, 'system', 'job.failed', { error: 'XAI_API_KEY is required' }, jobId);
+      await step.run('fail-xai', async () => {
+        await updateJobStatus(jobId, 'failed');
+        await logEvent(storeId, 'system', 'job.failed', { error: 'XAI_API_KEY is required' }, jobId);
+      });
       throw new Error('XAI_API_KEY is required');
     }
     if (!process.env.TAVILY_API_KEY) {
-      await updateJobStatus(jobId, 'failed');
-      await logEvent(storeId, 'system', 'job.failed', { error: 'TAVILY_API_KEY is required' }, jobId);
+      await step.run('fail-tavily', async () => {
+        await updateJobStatus(jobId, 'failed');
+        await logEvent(storeId, 'system', 'job.failed', { error: 'TAVILY_API_KEY is required' }, jobId);
+      });
       throw new Error('TAVILY_API_KEY is required');
     }
 
@@ -52,13 +55,21 @@ export const seoJob = inngest.createFunction(
     } catch (err: any) {
       console.error('SEO job failed at ensure', err);
       if (jobId && jobId !== 'unknown') {
-        try { await updateJobStatus(jobId, 'failed'); } catch {}
-        try { await logEvent(storeId, 'system', 'job.failed', { error: err.message || String(err) }, jobId); } catch {}
+        try {
+          await step.invoke('update-ensure-fail', {
+            function: updateJobStatusFn,
+            data: { jobId, status: 'failed' },
+          });
+        } catch {}
+        try {
+          await step.invoke('log-ensure-fail', {
+            function: logEventFn,
+            data: { storeId, actor: 'system', action: 'job.failed', payload: { error: err.message || String(err) }, jobId },
+          });
+        } catch {}
       }
       throw err;
     }
-
-    // Note: log-start already done directly above for visibility
 
     let researchResult: any, brief: any, draft: any, edited: any, optimized: any, scores: any, draftRecord: any;
 

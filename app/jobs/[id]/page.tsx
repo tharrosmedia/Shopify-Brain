@@ -1,12 +1,35 @@
-import { getJob } from '@/src/lib/db/jobs';
+import { getJob, updateJobStatus } from '@/src/lib/db/jobs';
 import { listApprovalsByJob } from '@/src/lib/db/approvals';
 import { listEventsByJob } from '@/src/lib/brain/events';
 import Link from 'next/link';
 import { cookies } from 'next/headers';
 import { listStores } from '@/src/lib/db/stores';
 import { notFound } from 'next/navigation';
+import { inngest } from '@/src/inngest/client';
 
 export const dynamic = 'force-dynamic';
+
+async function requeueJob(formData: FormData) {
+  'use server';
+  const jobId = formData.get('jobId') as string;
+  const storeId = formData.get('storeId') as string;
+  const keyword = formData.get('keyword') as string;
+  const type = (formData.get('type') as string) || 'collection';
+  try {
+    await updateJobStatus(jobId, 'queued');
+    console.log('[INNGEST] re-sending seo/job.requested', { jobId, type, hasEventKey: !!process.env.INNGEST_EVENT_KEY });
+    await inngest.send({
+      name: 'seo/job.requested',
+      data: { storeId, keyword, type, jobId },
+    });
+    console.log('[INNGEST] re-send completed for', jobId);
+    const { revalidatePath } = await import('next/cache');
+    revalidatePath(`/jobs/${jobId}`);
+    revalidatePath('/');
+  } catch (e: any) {
+    console.error('Failed to requeue to Inngest', e);
+  }
+}
 
 export default async function JobDetail({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -58,6 +81,16 @@ export default async function JobDetail({ params }: { params: Promise<{ id: stri
         <div><strong>Created:</strong> {new Date(job.createdAt).toLocaleString()}</div>
         <div><strong>Full ID:</strong> {job.id}</div>
       </div>
+
+      {['queued', 'failed'].includes(job.status) && (
+        <form action={requeueJob} className="mb-6">
+          <input type="hidden" name="jobId" value={job.id} />
+          <input type="hidden" name="storeId" value={job.storeId} />
+          <input type="hidden" name="keyword" value={keyword} />
+          <input type="hidden" name="type" value={job.type} />
+          <button type="submit" className="border px-3 py-1 text-sm">Re-send to Inngest</button>
+        </form>
+      )}
 
       <div className="mb-6">
         <h2 className="font-semibold mb-2">Activity Log (system notes)</h2>

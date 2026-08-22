@@ -24,11 +24,13 @@ async function triggerJob(formData: FormData) {
     sameSite: 'lax',
   });
   const job = await createJob({ storeId, domain: 'seo', type, input: { keyword }, status: 'queued' });
+  console.log('[INNGEST] sending seo/job.requested', { jobId: job.id, type, hasEventKey: !!process.env.INNGEST_EVENT_KEY });
   try {
     await inngest.send({
       name: 'seo/job.requested',
       data: { storeId, keyword, type, jobId: job.id },
     });
+    console.log('[INNGEST] send completed without throw for', job.id);
   } catch (e: any) {
     console.error('Failed to send to Inngest', e);
     await updateJobStatus(job.id, 'failed');

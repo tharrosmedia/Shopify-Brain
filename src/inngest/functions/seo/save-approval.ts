@@ -3,8 +3,10 @@ import { saveApproval } from '../../../lib/db/approvals';
 
 export const saveApprovalFn = inngest.createFunction(
   { id: 'seo-save-approval', retries: 2, triggers: [{ event: 'seo/save-approval' }] },
-  async ({ event }: any) => {
+  async ({ event, step }: any) => {
     const { jobId, storeId, status, reviewerNotes, editedPayload } = event.data;
-    return saveApproval({ jobId, storeId, status, reviewerNotes, editedPayload });
+    return await step.run('save-approval', async () => {
+      return saveApproval({ jobId, storeId, status, reviewerNotes, editedPayload });
+    });
   }
 );

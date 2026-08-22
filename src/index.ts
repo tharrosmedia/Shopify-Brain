@@ -9,11 +9,20 @@ const app = new Hono();
 
 app.get('/', (c) => c.text('Shopify Brain'));
 
-app.post('/api/inngest', inngestServe({ client: inngest, functions }));
+const inngestHandler = inngestServe({ client: inngest, functions });
+app.get('/api/inngest', inngestHandler);
+app.post('/api/inngest', inngestHandler);
+app.put('/api/inngest', inngestHandler);
 
 app.post('/api/approve', async (c) => {
   const body = await c.req.json();
-  await inngest.send({ name: 'approval/decided', data: body });
+  console.log('[INNGEST] sending approval/decided via hono', { jobId: body?.jobId });
+  try {
+    await inngest.send({ name: 'approval/decided', data: body });
+    console.log('[INNGEST] approval hono send completed');
+  } catch (e: any) {
+    console.error('Failed to send approval via hono', e);
+  }
   return c.json({ received: true });
 });
 

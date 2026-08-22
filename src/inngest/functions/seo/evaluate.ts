@@ -3,8 +3,10 @@ import { evaluate } from '../../../lib/agents/core/evaluate';
 
 export const evaluateFn = inngest.createFunction(
   { id: 'seo-evaluate', retries: 2, triggers: [{ event: 'seo/evaluate' }] },
-  async ({ event }: any) => {
+  async ({ event, step }: any) => {
     const { draft, type = 'collection' } = event.data;
-    return evaluate(draft, type);
+    return await step.run('evaluate', async () => {
+      return evaluate(draft, type);
+    });
   }
 );

@@ -29,13 +29,17 @@ async function decide(formData: FormData) {
 
   await saveApproval({ jobId, storeId, status, reviewerNotes: notes, editedPayload });
 
-  await inngest.send({ name: 'approval/decided', data: { status, notes, editedPayload, jobId, draftId } });
+  console.log('[INNGEST] sending approval/decided', { jobId, status });
+  try {
+    await inngest.send({ name: 'approval/decided', data: { status, notes, editedPayload, jobId, draftId } });
+    console.log('[INNGEST] approval send completed for', jobId);
+  } catch (e: any) {
+    console.error('Failed to send approval to Inngest', e);
+  }
 
-  // Update job status immediately for feedback (treat edited as approved for queue purposes)
   const finalStatus = status === 'approved' || status === 'edited' ? 'approved' : 'rejected';
   await updateJobStatus(jobId, finalStatus);
 
-  // Revalidate and redirect so user sees immediate change
   const { revalidatePath } = await import('next/cache');
   revalidatePath('/review');
   revalidatePath('/');

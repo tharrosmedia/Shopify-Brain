@@ -11,7 +11,8 @@
     "typecheck": "tsc --noEmit",
     "db:migrate": "tsx scripts/migrate.ts",
     "trigger:seo": "tsx scripts/trigger-seo.ts",
-    "test:shopify": "tsx scripts/test-shopify.ts"
+    "test:shopify": "tsx scripts/test-shopify.ts",
+    "inngest:sync": "tsx scripts/sync-inngest.ts"
   },
   "keywords": [],
   "author": "",
