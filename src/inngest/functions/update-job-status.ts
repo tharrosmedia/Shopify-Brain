@@ -8,5 +8,8 @@ export const updateJobStatusFn = inngest.createFunction(
     await step.run('update-status', async () => {
       await updateJobStatus(jobId, status, output);
     });
+    const { revalidatePath } = await import('next/cache');
+    revalidatePath('/');
+    revalidatePath('/review');
   }
 );

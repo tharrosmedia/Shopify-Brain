@@ -13,6 +13,12 @@ export async function getDraft(draftId: string) {
   return result[0];
 }
 
+export async function getDraftByJobId(jobId: string) {
+  const sql = neon(process.env.DATABASE_URL!);
+  const result = await sql`SELECT id, job_id as "jobId", store_id as "storeId", title, handle, body_html as "bodyHtml", meta_title as "metaTitle", meta_description as "metaDescription", evaluation_scores as "evaluationScores", created_at as "createdAt" FROM drafts WHERE job_id = ${jobId} ORDER BY created_at DESC LIMIT 1`;
+  return result[0];
+}
+
 export async function listDrafts(storeId: string, status?: string, limit: number = 50) {
   const sql = neon(process.env.DATABASE_URL!);
   if (status) {

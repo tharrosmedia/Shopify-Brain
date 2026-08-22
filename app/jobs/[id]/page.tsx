@@ -1,6 +1,7 @@
 import { getJob, updateJobStatus } from '@/src/lib/db/jobs';
 import { listApprovalsByJob } from '@/src/lib/db/approvals';
 import { listEventsByJob } from '@/src/lib/brain/events';
+import { getDraftByJobId } from '@/src/lib/db/drafts';
 import Link from 'next/link';
 import { cookies } from 'next/headers';
 import { listStores } from '@/src/lib/db/stores';
@@ -43,6 +44,7 @@ export default async function JobDetail({ params }: { params: Promise<{ id: stri
   let job: any = null;
   let approvals: any[] = [];
   let events: any[] = [];
+  let draft: any = null;
   let loadError: string | null = null;
   try {
     job = await getJob(id);
@@ -51,6 +53,9 @@ export default async function JobDetail({ params }: { params: Promise<{ id: stri
         listApprovalsByJob(id),
         listEventsByJob(id),
       ]);
+      if (job.status === 'awaiting_approval') {
+        draft = await getDraftByJobId(id);
+      }
     }
   } catch (e: any) {
     loadError = e.message || 'Failed to load job';
@@ -153,7 +158,11 @@ export default async function JobDetail({ params }: { params: Promise<{ id: stri
 
       {job.status === 'awaiting_approval' && (
         <div className="mt-6">
-          <Link href="/review" className="underline">Go to Review Queue to decide →</Link>
+          {draft ? (
+            <Link href={`/drafts/${draft.id}`} className="underline">Review &amp; Decide →</Link>
+          ) : (
+            <Link href="/review" className="underline">Go to Review Queue to decide →</Link>
+          )}
         </div>
       )}
     </div>

@@ -60,6 +60,8 @@ export default async function DraftDetail({ params }: { params: Promise<{ id: st
     return (
       <div className="p-8 max-w-4xl mx-auto">
         <Link href="/review" className="underline">← Back to Review</Link>
+        {' | '}
+        <Link href={`/jobs/${draft?.jobId || ''}`} className="underline">← Back to Job</Link>
         <div className="mt-4 p-3 bg-red-100 text-red-700 rounded">Error: {loadError}</div>
       </div>
     );
@@ -69,6 +71,8 @@ export default async function DraftDetail({ params }: { params: Promise<{ id: st
   return (
     <div className="p-8 max-w-4xl mx-auto">
       <Link href="/review" className="underline">← Back to Review</Link>
+      {' | '}
+      <Link href={`/jobs/${draft.jobId}`} className="underline">← Back to Job</Link>
       <h1 className="text-2xl font-bold mt-4 mb-2">{draft.title}</h1>
       <p className="text-sm text-muted-foreground mb-4">Handle: {draft.handle} | Job: {draft.jobId}</p>
       <p className="text-sm mb-4"><Link href={`/jobs/${draft.jobId}`} className="underline">View full job audit</Link></p>

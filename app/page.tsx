@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { cookies } from 'next/headers';
 import { listStores } from '@/src/lib/db/stores';
+import AutoRefresh from '@/components/auto-refresh';
 
 async function triggerJob(formData: FormData) {
   'use server';
@@ -96,12 +97,13 @@ export default async function Dashboard({ searchParams }: { searchParams?: Promi
     loadError = e.message || 'Failed to load jobs';
   }
 
-  const pending = jobs.filter((j: any) => j.status === 'awaiting_approval').length;
+  const awaitingApproval = jobs.filter((j: any) => j.status === 'awaiting_approval').length;
   const completed = jobs.filter((j: any) => j.status === 'completed').length;
 
   return (
     <div className="p-8 max-w-6xl mx-auto">
       <h1 className="text-3xl font-bold mb-8">Shopify Brain - cerevex.store</h1>
+      <AutoRefresh interval={4000} />
 
       {allStores.length === 0 && (
         <div className="mb-6 p-4 border border-blue-200 bg-blue-50 rounded">
@@ -126,8 +128,8 @@ export default async function Dashboard({ searchParams }: { searchParams?: Promi
 
       <div className="grid grid-cols-3 gap-4 mb-8">
         <div className="border p-4 rounded">
-          <div className="text-sm text-muted-foreground">Pending Review</div>
-          <div className="text-3xl font-bold">{pending}</div>
+          <div className="text-sm text-muted-foreground">Awaiting Approval</div>
+          <div className="text-3xl font-bold">{awaitingApproval}</div>
         </div>
         <div className="border p-4 rounded">
           <div className="text-sm text-muted-foreground">Completed</div>
