@@ -16,9 +16,9 @@ export async function getDraft(draftId: string) {
 export async function listDrafts(storeId: string, status?: string, limit: number = 50) {
   const sql = neon(process.env.DATABASE_URL!);
   if (status) {
-    return sql`SELECT d.id, d.job_id as "jobId", d.store_id as "storeId", d.title, d.handle, d.body_html as "bodyHtml", d.meta_title as "metaTitle", d.meta_description as "metaDescription", d.evaluation_scores as "evaluationScores", d.created_at as "createdAt", j.status as "jobStatus" FROM drafts d LEFT JOIN jobs j ON d.job_id = j.id WHERE d.store_id = ${storeId} AND j.status = ${status} ORDER BY d.created_at DESC LIMIT ${limit}`;
+    return sql`SELECT d.id, d.job_id as "jobId", d.store_id as "storeId", d.title, d.handle, d.body_html as "bodyHtml", d.meta_title as "metaTitle", d.meta_description as "metaDescription", d.evaluation_scores as "evaluationScores", d.created_at as "createdAt", j.status as "jobStatus", j.type as "type" FROM drafts d LEFT JOIN jobs j ON d.job_id = j.id WHERE d.store_id = ${storeId} AND j.status = ${status} ORDER BY d.created_at DESC LIMIT ${limit}`;
   }
-  return sql`SELECT d.id, d.job_id as "jobId", d.store_id as "storeId", d.title, d.handle, d.body_html as "bodyHtml", d.meta_title as "metaTitle", d.meta_description as "metaDescription", d.evaluation_scores as "evaluationScores", d.created_at as "createdAt", j.status as "jobStatus" FROM drafts d LEFT JOIN jobs j ON d.job_id = j.id WHERE d.store_id = ${storeId} ORDER BY d.created_at DESC LIMIT ${limit}`;
+  return sql`SELECT d.id, d.job_id as "jobId", d.store_id as "storeId", d.title, d.handle, d.body_html as "bodyHtml", d.meta_title as "metaTitle", d.meta_description as "metaDescription", d.evaluation_scores as "evaluationScores", d.created_at as "createdAt", j.status as "jobStatus", j.type as "type" FROM drafts d LEFT JOIN jobs j ON d.job_id = j.id WHERE d.store_id = ${storeId} ORDER BY d.created_at DESC LIMIT ${limit}`;
 }
 
 export async function updateDraft(draftId: string, updates: Partial<{ title: string; handle: string; bodyHtml: string; metaTitle: string; metaDescription: string; metafields: any; schemaJsonLd: any }>) {

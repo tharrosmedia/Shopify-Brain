@@ -1,8 +1,12 @@
-export async function createBrief({ storeId, keyword, research }: { storeId: string; keyword: string; research: any }) {
+export async function createBrief({ storeId, keyword, research, type = 'collection' }: { storeId: string; keyword: string; research: any; type?: string }) {
+  let sections = ['intro', 'key specs', 'comparison', 'faqs'];
+  if (type === 'page') sections = ['intro', 'details', 'benefits', 'faqs'];
+  else if (type === 'blog') sections = ['intro', 'tips', 'examples', 'faqs'];
   return {
     keyword,
+    type,
     intent: 'informational commercial',
-    sections: ['intro', 'key specs', 'comparison', 'faqs'],
+    sections,
     researchSummary: research?.summary || '',
   };
 }

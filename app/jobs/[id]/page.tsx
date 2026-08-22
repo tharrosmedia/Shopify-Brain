@@ -53,6 +53,7 @@ export default async function JobDetail({ params }: { params: Promise<{ id: stri
 
       <div className="mb-6 border p-4 rounded text-sm">
         <div><strong>Status:</strong> {job.status}</div>
+        <div><strong>Type:</strong> {job.type}</div>
         <div><strong>Keyword / Input:</strong> {keyword}</div>
         <div><strong>Created:</strong> {new Date(job.createdAt).toLocaleString()}</div>
         <div><strong>Full ID:</strong> {job.id}</div>

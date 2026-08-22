@@ -1,0 +1,10 @@
+import { inngest } from '../client';
+import { updateJobStatus } from '../../lib/db/jobs';
+
+export const updateJobStatusFn = inngest.createFunction(
+  { id: 'update-job-status', retries: 2, triggers: [{ event: 'update-job-status' }] },
+  async ({ event }: any) => {
+    const { jobId, status, output } = event.data;
+    await updateJobStatus(jobId, status, output);
+  }
+);

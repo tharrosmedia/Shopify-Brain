@@ -1,0 +1,10 @@
+import { inngest } from '../../client';
+import { createBrief } from '../../../lib/agents/seo/brief';
+
+export const createBriefFn = inngest.createFunction(
+  { id: 'seo-create-brief', retries: 2, triggers: [{ event: 'seo/create-brief' }] },
+  async ({ event }: any) => {
+    const { storeId, keyword, research, type = 'collection' } = event.data;
+    return createBrief({ storeId, keyword, research, type });
+  }
+);

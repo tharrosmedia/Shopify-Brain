@@ -9,6 +9,7 @@ import { listStores } from '@/src/lib/db/stores';
 async function triggerJob(formData: FormData) {
   'use server';
   const keyword = formData.get('keyword') as string;
+  const type = (formData.get('type') as string) || 'collection';
   if (!keyword) return;
   const cookieStore = await cookies();
   let storeId = cookieStore.get('activeStoreId')?.value || process.env.DEV_STORE_ID || '11111111-1111-1111-1111-111111111111';
@@ -22,10 +23,10 @@ async function triggerJob(formData: FormData) {
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
   });
-  const job = await createJob({ storeId, domain: 'seo', type: 'catalog_page', input: { keyword } });
+  const job = await createJob({ storeId, domain: 'seo', type, input: { keyword } });
   await inngest.send({
-    name: 'seo/catalog-page.requested',
-    data: { storeId, keyword, jobId: job.id },
+    name: 'seo/job.requested',
+    data: { storeId, keyword, type, jobId: job.id },
   });
   const { revalidatePath } = await import('next/cache');
   revalidatePath('/');
@@ -93,9 +94,14 @@ export default async function Dashboard() {
       </div>
 
       <div className="mb-8 border p-4 rounded">
-        <h2 className="font-semibold mb-4">Trigger New SEO Job</h2>
+        <h2 className="font-semibold mb-4">Trigger New Shopify Job</h2>
         <form action={triggerJob} className="flex gap-2">
           <input name="keyword" placeholder="e.g. daikin single zone mini split" className="border p-2 flex-1" required />
+          <select name="type" defaultValue="collection" className="border p-2">
+            <option value="collection">Collection</option>
+            <option value="page">Page</option>
+            <option value="blog">Blog Post</option>
+          </select>
           <Button type="submit">Trigger</Button>
         </form>
       </div>
@@ -106,6 +112,7 @@ export default async function Dashboard() {
           <thead>
             <tr className="bg-muted">
               <th className="p-2 text-left">ID</th>
+              <th className="p-2 text-left">Type</th>
               <th className="p-2 text-left">Keyword / Input</th>
               <th className="p-2 text-left">Status</th>
               <th className="p-2 text-left">Created</th>
@@ -114,11 +121,12 @@ export default async function Dashboard() {
           </thead>
           <tbody>
             {jobs.length === 0 && !loadError && (
-              <tr><td colSpan={5} className="p-4 text-center text-muted-foreground">No jobs yet for this store.</td></tr>
+              <tr><td colSpan={6} className="p-4 text-center text-muted-foreground">No jobs yet for this store.</td></tr>
             )}
             {jobs.map((job: any) => (
               <tr key={job.id} className="border-t">
                 <td className="p-2 font-mono text-xs">{job.id.slice(0, 8)}</td>
+                <td className="p-2">{job.type}</td>
                 <td className="p-2">{JSON.stringify(job.input)}</td>
                 <td className="p-2">{job.status}</td>
                 <td className="p-2 text-sm">{new Date(job.createdAt).toLocaleString()}</td>

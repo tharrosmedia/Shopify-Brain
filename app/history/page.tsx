@@ -38,6 +38,7 @@ export default async function History() {
         <thead>
           <tr className="bg-muted">
             <th className="p-2 text-left">ID</th>
+            <th className="p-2 text-left">Type</th>
             <th className="p-2 text-left">Input</th>
             <th className="p-2">Status</th>
             <th className="p-2">Created</th>
@@ -46,10 +47,11 @@ export default async function History() {
           </tr>
         </thead>
         <tbody>
-          {jobs.length === 0 && !loadError && <tr><td colSpan={6} className="p-4 text-center text-muted-foreground">No jobs yet.</td></tr>}
+          {jobs.length === 0 && !loadError && <tr><td colSpan={7} className="p-4 text-center text-muted-foreground">No jobs yet.</td></tr>}
           {jobs.map((j: any) => (
             <tr key={j.id} className="border-t">
               <td className="p-2 font-mono">{j.id.slice(0,8)}</td>
+              <td className="p-2">{j.type}</td>
               <td className="p-2">{JSON.stringify(j.input)}</td>
               <td className="p-2 text-center">{j.status}</td>
               <td className="p-2">{new Date(j.createdAt).toLocaleDateString()}</td>
