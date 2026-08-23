@@ -4,7 +4,7 @@ import { createAndPublishPage } from '../../shopify/pages';
 import { createAndPublishArticle } from '../../shopify/blogs';
 import { getStore } from '../../db/stores';
 
-export async function publishContent({ storeId, draft, type = 'collection' }: { storeId: string; draft: any; type?: string }) {
+export async function publishContent({ storeId, draft, type = 'collection', platform }: { storeId: string; draft: any; type?: string; platform?: string }) {
   const store = await getStore(storeId);
   if (!store || !store.shopify_access_token) {
     throw new Error(`No Shopify credentials configured for store ${storeId}`);

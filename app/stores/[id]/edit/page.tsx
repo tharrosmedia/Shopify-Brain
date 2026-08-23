@@ -10,10 +10,14 @@ async function update(formData: FormData) {
   const name = formData.get('name') as string;
   const shopify_domain = formData.get('shopify_domain') as string;
   const shopify_access_token = formData.get('shopify_access_token') as string;
+  const platform = (formData.get('platform') as string) || 'shopify';
   if (!name || !shopify_domain) {
     redirect(`/stores/${id}/edit?error=missing`);
   }
-  await updateStore(id, { name, shopify_domain, shopify_access_token: shopify_access_token || '' });
+  if (shopify_access_token && !process.env.ENCRYPTION_KEY) {
+    redirect(`/stores/${id}/edit?error=encryption`);
+  }
+  await updateStore(id, { name, shopify_domain, shopify_access_token: shopify_access_token || '', platform });
   revalidatePath('/stores');
   redirect('/stores?updated=1');
 }
@@ -30,7 +34,8 @@ export default async function EditStore({ params, searchParams }: { params: Prom
       <Link href="/stores" className="underline">← Back to Stores</Link>
       <h1 className="text-2xl font-bold my-4">Edit Store: {store.name}</h1>
 
-      {sp.error && <div className="mb-4 p-2 bg-red-100 text-red-700">Missing required fields.</div>}
+      {sp.error === 'missing' && <div className="mb-4 p-2 bg-red-100 text-red-700">Missing required fields.</div>}
+      {sp.error === 'encryption' && <div className="mb-4 p-2 bg-red-100 text-red-700">ENCRYPTION_KEY must be set in environment to update the access token.</div>}
 
       <form action={update} className="space-y-3 border p-4 rounded">
         <input type="hidden" name="id" value={id} />
@@ -41,6 +46,14 @@ export default async function EditStore({ params, searchParams }: { params: Prom
         <div>
           <label className="block text-sm">Shopify Domain</label>
           <input name="shopify_domain" defaultValue={store.shopify_domain} className="border p-2 w-full" required />
+        </div>
+        <div>
+          <label className="block text-sm">Platform</label>
+          <select name="platform" defaultValue={store.platform || 'shopify'} className="border p-2 w-full">
+            <option value="shopify">Shopify</option>
+            <option value="woocommerce">WooCommerce</option>
+            <option value="other">Other</option>
+          </select>
         </div>
         <div>
           <label className="block text-sm">Access Token (leave blank to keep existing)</label>

@@ -14,9 +14,15 @@ async function triggerJob(formData: FormData) {
   if (!keyword) return;
   const cookieStore = await cookies();
   let storeId = cookieStore.get('activeStoreId')?.value || process.env.DEV_STORE_ID || '11111111-1111-1111-1111-111111111111';
+  let platform = 'shopify';
   if (!storeId || storeId === 'undefined') {
     const stores = await listStores();
     storeId = stores[0]?.id || '11111111-1111-1111-1111-111111111111';
+    platform = stores[0]?.platform || 'shopify';
+  } else {
+    const stores = await listStores();
+    const current = stores.find((s: any) => s.id === storeId) || stores[0];
+    platform = current?.platform || 'shopify';
   }
   const c = await cookies();
   c.set('activeStoreId', storeId, {
@@ -24,12 +30,12 @@ async function triggerJob(formData: FormData) {
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
   });
-  const job = await createJob({ storeId, domain: 'seo', type, input: { keyword }, status: 'queued' });
+  const job = await createJob({ storeId, domain: 'seo', type, input: { keyword, platform }, status: 'queued' });
   console.log('[INNGEST] sending seo/job.requested', { jobId: job.id, type, hasEventKey: !!process.env.INNGEST_EVENT_KEY });
   try {
     await inngest.send({
       name: 'seo/job.requested',
-      data: { storeId, keyword, type, jobId: job.id },
+      data: { storeId, keyword, type, platform, jobId: job.id },
     });
     console.log('[INNGEST] send completed without throw for', job.id);
   } catch (e: any) {

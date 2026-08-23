@@ -38,10 +38,14 @@ async function addStore(formData: FormData) {
   const name = formData.get('name') as string;
   const shopify_domain = formData.get('shopify_domain') as string;
   const shopify_access_token = formData.get('shopify_access_token') as string;
+  const platform = (formData.get('platform') as string) || 'shopify';
   if (!name || !shopify_domain || !shopify_access_token) {
     redirect(`/stores?add=error&msg=${encodeURIComponent('All fields required')}`);
   }
-  const newStore = await createStore({ name, shopify_domain, shopify_access_token });
+  if (!process.env.ENCRYPTION_KEY) {
+    redirect(`/stores?add=error&msg=${encodeURIComponent('ENCRYPTION_KEY is required to add a store with access token')}`);
+  }
+  const newStore = await createStore({ name, shopify_domain, shopify_access_token, platform });
   const cookieStore = await cookies();
   cookieStore.set('activeStoreId', newStore.id, {
     path: '/',
@@ -94,6 +98,14 @@ export default async function StoresPage({ searchParams }: { searchParams: Promi
             <input name="name" placeholder="My Store" className="border p-2 w-full" required />
           </div>
           <div>
+            <label className="block text-sm font-medium mb-1">Platform</label>
+            <select name="platform" defaultValue="shopify" className="border p-2 w-full">
+              <option value="shopify">Shopify</option>
+              <option value="woocommerce">WooCommerce</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+          <div>
             <label className="block text-sm font-medium mb-1">Shopify Domain</label>
             <input name="shopify_domain" placeholder="your-store.myshopify.com" className="border p-2 w-full" required />
             <p className="text-xs text-muted-foreground mt-1">Exact format, e.g. hvacusa.myshopify.com (no https://, no trailing slash)</p>
@@ -111,20 +123,22 @@ export default async function StoresPage({ searchParams }: { searchParams: Promi
       {stores.length === 0 && !loadError && <p>No stores yet. Add one above.</p>}
       <table className="w-full border">
         <thead>
-          <tr className="bg-muted">
-            <th className="p-2 text-left">Name</th>
-            <th className="p-2 text-left">Domain</th>
-            <th className="p-2 text-left">Created</th>
-            <th className="p-2">Actions</th>
-          </tr>
+           <tr className="bg-muted">
+             <th className="p-2 text-left">Name</th>
+             <th className="p-2 text-left">Domain</th>
+             <th className="p-2 text-left">Platform</th>
+             <th className="p-2 text-left">Created</th>
+             <th className="p-2">Actions</th>
+           </tr>
         </thead>
         <tbody>
           {stores.map((store: any) => (
-            <tr key={store.id} className="border-t">
-              <td className="p-2">{store.name}</td>
-              <td className="p-2">{store.shopify_domain}</td>
-              <td className="p-2 text-sm">{new Date(store.created_at).toLocaleDateString()}</td>
-              <td className="p-2 space-x-2">
+             <tr key={store.id} className="border-t">
+               <td className="p-2">{store.name}</td>
+               <td className="p-2">{store.shopify_domain}</td>
+               <td className="p-2">{store.platform || 'shopify'}</td>
+               <td className="p-2 text-sm">{new Date(store.created_at).toLocaleDateString()}</td>
+               <td className="p-2 space-x-2">
                 <form action={testConnection} className="inline">
                   <input type="hidden" name="storeId" value={store.id} />
                   <Button type="submit" variant="outline" size="sm">Test Connection</Button>

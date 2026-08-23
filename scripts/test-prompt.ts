@@ -12,26 +12,29 @@ const isDry = args.includes('--dry');
 let brandVoice: string | undefined = undefined;
 const brandIdx = args.indexOf('--brand');
 if (brandIdx !== -1 && args[brandIdx + 1]) brandVoice = args[brandIdx + 1];
+let platform = 'shopify';
+const platIdx = args.indexOf('--platform');
+if (platIdx !== -1 && args[platIdx + 1]) platform = args[platIdx + 1];
 const keyword = args.find(a => !a.startsWith('--') && a !== cmd) || 'daikin single zone mini split';
 const type = 'collection';
 const storeId = process.env.DEV_STORE_ID || '11111111-1111-1111-1111-111111111111';
 
 if (cmd === 'help' || cmd === '--help') {
-  console.log('Usage: tsx scripts/test-prompt.ts <research|writer> [keyword] [--real] [--brand "voice here"]');
+  console.log('Usage: tsx scripts/test-prompt.ts <research|writer> [keyword] [--real] [--brand "voice here"] [--platform "shopify"]');
   process.exit(0);
 }
 
 async function run() {
   if (cmd === 'research') {
     const sampleData = { results: [{ title: 'Sample', content: 'Key facts about ' + keyword }] };
-    const allMsgs = buildResearchMessages({ keyword, type, searchData: sampleData, brandVoice });
+    const allMsgs = buildResearchMessages({ keyword, type, searchData: sampleData, brandVoice, platform });
     if (isDry) {
       console.log('DRY research messages:', JSON.stringify(allMsgs, null, 2));
       return;
     }
     if (isReal) {
       console.log('Running real research (Tavily + LLM)...');
-      const result = await research({ storeId, keyword, type });
+      const result = await research({ storeId, keyword, type, platform });
       console.dir(result, { depth: 2 });
     } else {
       console.log('Running isolated research prompt...');
@@ -41,15 +44,15 @@ async function run() {
       console.log('OUTPUT:\n' + text);
     }
   } else if (cmd === 'writer') {
-    const sampleBrief = { keyword, type, intent: 'commercial', sections: ['intro', 'specs'], researchSummary: 'Sample research for ' + keyword };
-    const allMsgs = buildWriterMessages({ brief: sampleBrief, type, brandVoice });
+    const sampleBrief = { keyword, type, platform, intent: 'commercial', sections: ['intro', 'specs'], researchSummary: 'Sample research for ' + keyword };
+    const allMsgs = buildWriterMessages({ brief: sampleBrief, type, brandVoice, platform });
     if (isDry) {
       console.log('DRY writer messages:', JSON.stringify(allMsgs, null, 2));
       return;
     }
     if (isReal) {
       console.log('Running real writeDraft...');
-      const result = await writeDraft({ storeId, brief: sampleBrief, type });
+      const result = await writeDraft({ storeId, brief: sampleBrief, type, platform });
       console.dir(result, { depth: 1 });
     } else {
       console.log('Running isolated writer prompt...');

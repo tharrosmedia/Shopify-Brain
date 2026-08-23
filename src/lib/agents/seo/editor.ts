@@ -1,3 +1,3 @@
-export async function editDraft({ storeId, draft, type = 'collection' }: { storeId: string; draft: any; type?: string }) {
+export async function editDraft({ storeId, draft, type = 'collection', platform }: { storeId: string; draft: any; type?: string; platform?: string }) {
   return { ...draft, type };
 }

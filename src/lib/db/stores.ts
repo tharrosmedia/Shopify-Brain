@@ -4,12 +4,12 @@ import { encrypt, decrypt } from '../encryption';
 
 export async function listStores() {
   const sql = neon(process.env.DATABASE_URL!);
-  return sql`SELECT id, name, shopify_domain, created_at FROM stores ORDER BY created_at DESC`;
+  return sql`SELECT id, name, shopify_domain, platform, created_at FROM stores ORDER BY created_at DESC`;
 }
 
 export async function getStore(id: string) {
   const sql = neon(process.env.DATABASE_URL!);
-  const result = await sql`SELECT id, name, shopify_domain, shopify_access_token FROM stores WHERE id = ${id}`;
+  const result = await sql`SELECT id, name, shopify_domain, shopify_access_token, platform FROM stores WHERE id = ${id}`;
   const row = result[0];
   if (row && row.shopify_access_token) {
     try {
@@ -22,21 +22,21 @@ export async function getStore(id: string) {
   return row;
 }
 
-export async function createStore({ name, shopify_domain, shopify_access_token }: { name: string; shopify_domain: string; shopify_access_token: string }) {
+export async function createStore({ name, shopify_domain, shopify_access_token, platform = 'shopify' }: { name: string; shopify_domain: string; shopify_access_token: string; platform?: string }) {
   const sql = neon(process.env.DATABASE_URL!);
   const encryptedToken = encrypt(shopify_access_token, process.env.ENCRYPTION_KEY!);
-  const result = await sql`INSERT INTO stores (name, shopify_domain, shopify_access_token) VALUES (${name}, ${shopify_domain}, ${encryptedToken}) RETURNING id, name, shopify_domain, created_at`;
+  const result = await sql`INSERT INTO stores (name, shopify_domain, shopify_access_token, platform) VALUES (${name}, ${shopify_domain}, ${encryptedToken}, ${platform}) RETURNING id, name, shopify_domain, platform, created_at`;
   return result[0];
 }
 
-export async function updateStore(id: string, { name, shopify_domain, shopify_access_token }: { name: string; shopify_domain: string; shopify_access_token: string }) {
+export async function updateStore(id: string, { name, shopify_domain, shopify_access_token, platform = 'shopify' }: { name: string; shopify_domain: string; shopify_access_token: string; platform?: string }) {
   const sql = neon(process.env.DATABASE_URL!);
   if (shopify_access_token && shopify_access_token.length > 0) {
     const encrypted = encrypt(shopify_access_token, process.env.ENCRYPTION_KEY!);
-    const result = await sql`UPDATE stores SET name = ${name}, shopify_domain = ${shopify_domain}, shopify_access_token = ${encrypted}, updated_at = now() WHERE id = ${id} RETURNING id, name, shopify_domain, created_at`;
+    const result = await sql`UPDATE stores SET name = ${name}, shopify_domain = ${shopify_domain}, shopify_access_token = ${encrypted}, platform = ${platform}, updated_at = now() WHERE id = ${id} RETURNING id, name, shopify_domain, platform, created_at`;
     return result[0];
   } else {
-    const result = await sql`UPDATE stores SET name = ${name}, shopify_domain = ${shopify_domain}, updated_at = now() WHERE id = ${id} RETURNING id, name, shopify_domain, created_at`;
+    const result = await sql`UPDATE stores SET name = ${name}, shopify_domain = ${shopify_domain}, platform = ${platform}, updated_at = now() WHERE id = ${id} RETURNING id, name, shopify_domain, platform, created_at`;
     return result[0];
   }
 }
