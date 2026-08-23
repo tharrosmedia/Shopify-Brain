@@ -42,9 +42,6 @@ async function addStore(formData: FormData) {
   if (!name || !shopify_domain || !shopify_access_token) {
     redirect(`/stores?add=error&msg=${encodeURIComponent('All fields required')}`);
   }
-  if (!process.env.ENCRYPTION_KEY) {
-    redirect(`/stores?add=error&msg=${encodeURIComponent('ENCRYPTION_KEY is required to add a store with access token')}`);
-  }
   const newStore = await createStore({ name, shopify_domain, shopify_access_token, platform });
   const cookieStore = await cookies();
   cookieStore.set('activeStoreId', newStore.id, {

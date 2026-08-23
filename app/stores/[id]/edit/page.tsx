@@ -14,9 +14,6 @@ async function update(formData: FormData) {
   if (!name || !shopify_domain) {
     redirect(`/stores/${id}/edit?error=missing`);
   }
-  if (shopify_access_token && !process.env.ENCRYPTION_KEY) {
-    redirect(`/stores/${id}/edit?error=encryption`);
-  }
   await updateStore(id, { name, shopify_domain, shopify_access_token: shopify_access_token || '', platform });
   revalidatePath('/stores');
   redirect('/stores?updated=1');
@@ -35,7 +32,6 @@ export default async function EditStore({ params, searchParams }: { params: Prom
       <h1 className="text-2xl font-bold my-4">Edit Store: {store.name}</h1>
 
       {sp.error === 'missing' && <div className="mb-4 p-2 bg-red-100 text-red-700">Missing required fields.</div>}
-      {sp.error === 'encryption' && <div className="mb-4 p-2 bg-red-100 text-red-700">ENCRYPTION_KEY must be set in environment to update the access token.</div>}
 
       <form action={update} className="space-y-3 border p-4 rounded">
         <input type="hidden" name="id" value={id} />

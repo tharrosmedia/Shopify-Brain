@@ -12,7 +12,8 @@ function getKey(secret: string) {
 
 export function encrypt(text: string, secret: string): string {
   if (!secret) {
-    throw new Error('ENCRYPTION_KEY is required for token encryption');
+    console.warn('ENCRYPTION_KEY not set - storing access token in plaintext (insecure!)');
+    return text;
   }
   const key = getKey(secret);
   const iv = randomBytes(IV_LENGTH);
@@ -26,7 +27,8 @@ export function encrypt(text: string, secret: string): string {
 
 export function decrypt(encryptedText: string, secret: string): string {
   if (!secret) {
-    throw new Error('ENCRYPTION_KEY is required for token decryption');
+    console.warn('ENCRYPTION_KEY not set - assuming access token is plaintext');
+    return encryptedText;
   }
   const key = getKey(secret);
   const parts = encryptedText.split(':');
