@@ -11,10 +11,15 @@ async function update(formData: FormData) {
   const shopify_domain = formData.get('shopify_domain') as string;
   const shopify_access_token = formData.get('shopify_access_token') as string;
   const platform = (formData.get('platform') as string) || 'shopify';
+  let config: any = undefined;
+  const configStr = formData.get('config') as string;
+  if (configStr && configStr.trim()) {
+    try { config = JSON.parse(configStr); } catch {}
+  }
   if (!name || !shopify_domain) {
     redirect(`/stores/${id}/edit?error=missing`);
   }
-  await updateStore(id, { name, shopify_domain, shopify_access_token: shopify_access_token || '', platform });
+  await updateStore(id, { name, shopify_domain, shopify_access_token: shopify_access_token || '', platform, config });
   revalidatePath('/stores');
   redirect('/stores?updated=1');
 }
@@ -51,11 +56,15 @@ export default async function EditStore({ params, searchParams }: { params: Prom
             <option value="other">Other</option>
           </select>
         </div>
-        <div>
-          <label className="block text-sm">Access Token (leave blank to keep existing)</label>
-          <input name="shopify_access_token" type="password" placeholder="shpat_... (optional to update)" className="border p-2 w-full" />
-        </div>
-        <Button type="submit">Save Changes</Button>
+         <div>
+           <label className="block text-sm">Access Token (leave blank to keep existing)</label>
+           <input name="shopify_access_token" type="password" placeholder="shpat_... (optional to update)" className="border p-2 w-full" />
+         </div>
+         <div>
+           <label className="block text-sm">Config (JSON, optional)</label>
+           <textarea name="config" defaultValue={store.config ? JSON.stringify(store.config, null, 2) : ''} className="border p-2 w-full h-24 font-mono text-sm" />
+         </div>
+         <Button type="submit">Save Changes</Button>
       </form>
     </div>
   );

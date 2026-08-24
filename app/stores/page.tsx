@@ -39,10 +39,15 @@ async function addStore(formData: FormData) {
   const shopify_domain = formData.get('shopify_domain') as string;
   const shopify_access_token = formData.get('shopify_access_token') as string;
   const platform = (formData.get('platform') as string) || 'shopify';
+  let config: any = undefined;
+  const configStr = formData.get('config') as string;
+  if (configStr && configStr.trim()) {
+    try { config = JSON.parse(configStr); } catch {}
+  }
   if (!name || !shopify_domain || !shopify_access_token) {
     redirect(`/stores?add=error&msg=${encodeURIComponent('All fields required')}`);
   }
-  const newStore = await createStore({ name, shopify_domain, shopify_access_token, platform });
+  const newStore = await createStore({ name, shopify_domain, shopify_access_token, platform, config });
   const cookieStore = await cookies();
   cookieStore.set('activeStoreId', newStore.id, {
     path: '/',
@@ -107,12 +112,16 @@ export default async function StoresPage({ searchParams }: { searchParams: Promi
             <input name="shopify_domain" placeholder="your-store.myshopify.com" className="border p-2 w-full" required />
             <p className="text-xs text-muted-foreground mt-1">Exact format, e.g. hvacusa.myshopify.com (no https://, no trailing slash)</p>
           </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">Shopify Access Token</label>
-            <input name="shopify_access_token" placeholder="shpat_..." type="password" className="border p-2 w-full" required />
-            <p className="text-xs text-muted-foreground mt-1">Admin API token (starts with shpat_). Create at Shopify Admin → Settings → Apps and sales channels → Develop apps. Grant read_products + write_collections at minimum.</p>
-          </div>
-          <Button type="submit">Add Store</Button>
+           <div>
+             <label className="block text-sm font-medium mb-1">Shopify Access Token</label>
+             <input name="shopify_access_token" placeholder="shpat_..." type="password" className="border p-2 w-full" required />
+             <p className="text-xs text-muted-foreground mt-1">Admin API token (starts with shpat_). Create at Shopify Admin → Settings → Apps and sales channels → Develop apps. Grant read_products + write_collections at minimum.</p>
+           </div>
+           <div>
+             <label className="block text-sm font-medium mb-1">Config (JSON, optional)</label>
+             <textarea name="config" placeholder='{"placement":{"collection":{"body":{"target":"main"}}}}' className="border p-2 w-full h-24 font-mono text-sm" />
+           </div>
+           <Button type="submit">Add Store</Button>
         </form>
       </div>
 
