@@ -23,7 +23,7 @@ function getResourceId(response: any, type: string): string | null {
   return response?.data?.collectionCreate?.collection?.id || null;
 }
 
-export async function publishContent({ storeId, draft, type = 'collection', platform }: { storeId: string; draft: any; type?: string; platform?: string }) {
+export async function publishContent({ storeId, draft, type = 'collection', platform, brandVoice }: { storeId: string; draft: any; type?: string; platform?: string; brandVoice?: any }) {
   const store = await getStore(storeId);
   if (!store || !store.shopify_access_token) {
     throw new Error(`No Shopify credentials configured for store ${storeId}`);

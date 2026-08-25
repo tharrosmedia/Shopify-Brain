@@ -15,14 +15,23 @@ async function triggerJob(formData: FormData) {
   const cookieStore = await cookies();
   let storeId = cookieStore.get('activeStoreId')?.value || process.env.DEV_STORE_ID || '11111111-1111-1111-1111-111111111111';
   let platform = 'shopify';
+  let brandVoice: any = undefined;
+  let autonomy: any = undefined;
   if (!storeId || storeId === 'undefined') {
     const stores = await listStores();
     storeId = stores[0]?.id || '11111111-1111-1111-1111-111111111111';
     platform = stores[0]?.platform || 'shopify';
+    brandVoice = stores[0]?.config?.brandVoice;
+    autonomy = stores[0]?.config?.autonomy;
   } else {
     const stores = await listStores();
     const current = stores.find((s: any) => s.id === storeId) || stores[0];
     platform = current?.platform || 'shopify';
+    brandVoice = current?.config?.brandVoice;
+    autonomy = current?.config?.autonomy;
+  }
+  if (autonomy?.allowedTypes && !autonomy.allowedTypes.includes(type)) {
+    throw new Error(`Type ${type} not allowed for this store per autonomy config`);
   }
   const c = await cookies();
   c.set('activeStoreId', storeId, {
@@ -30,12 +39,12 @@ async function triggerJob(formData: FormData) {
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
   });
-  const job = await createJob({ storeId, domain: 'seo', type, input: { keyword, platform }, status: 'queued' });
+  const job = await createJob({ storeId, domain: 'seo', type, input: { keyword, platform, brandVoice }, status: 'queued' });
   console.log('[INNGEST] sending seo/job.requested', { jobId: job.id, type, hasEventKey: !!process.env.INNGEST_EVENT_KEY });
   try {
     await inngest.send({
       name: 'seo/job.requested',
-      data: { storeId, keyword, type, platform, jobId: job.id },
+      data: { storeId, keyword, type, platform, brandVoice, jobId: job.id },
     });
     console.log('[INNGEST] send completed without throw for', job.id);
   } catch (e: any) {

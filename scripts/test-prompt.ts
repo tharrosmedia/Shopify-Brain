@@ -32,9 +32,9 @@ async function run() {
       console.log('DRY research messages:', JSON.stringify(allMsgs, null, 2));
       return;
     }
-    if (isReal) {
+      if (isReal) {
       console.log('Running real research (Tavily + LLM)...');
-      const result = await research({ storeId, keyword, type, platform });
+      const result = await research({ storeId, keyword, type, platform, brandVoice });
       console.dir(result, { depth: 2 });
     } else {
       console.log('Running isolated research prompt...');
@@ -44,7 +44,7 @@ async function run() {
       console.log('OUTPUT:\n' + text);
     }
   } else if (cmd === 'writer') {
-    const sampleBrief = { keyword, type, platform, intent: 'commercial', sections: ['intro', 'specs'], researchSummary: 'Sample research for ' + keyword };
+    const sampleBrief = { keyword, type, platform, brandVoice, intent: 'commercial', sections: ['intro', 'specs'], researchSummary: 'Sample research for ' + keyword };
     const allMsgs = buildWriterMessages({ brief: sampleBrief, type, brandVoice, platform });
     if (isDry) {
       console.log('DRY writer messages:', JSON.stringify(allMsgs, null, 2));
@@ -52,7 +52,7 @@ async function run() {
     }
     if (isReal) {
       console.log('Running real writeDraft...');
-      const result = await writeDraft({ storeId, brief: sampleBrief, type, platform });
+      const result = await writeDraft({ storeId, brief: sampleBrief, type, platform, brandVoice });
       console.dir(result, { depth: 1 });
     } else {
       console.log('Running isolated writer prompt...');

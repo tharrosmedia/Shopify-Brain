@@ -16,8 +16,21 @@ export interface Placement {
   }>;
 }
 
+export interface BrandVoice {
+  text: string;
+  inferredAt?: string;
+  samplesUsed?: number;
+}
+
+export interface Autonomy {
+  allowedTypes?: Array<'collection' | 'page' | 'blog'>;
+  requireApproval?: boolean;
+}
+
 export interface StoreConfig {
   placement?: Record<string, Placement>;
+  brandVoice?: BrandVoice;
+  autonomy?: Autonomy;
 }
 
 export interface Store {

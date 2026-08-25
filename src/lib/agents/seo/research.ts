@@ -2,7 +2,7 @@ import { generateText } from 'ai';
 import { xai, XAI_MODEL } from '../../ai/xai';
 import { buildResearchMessages } from '../../prompts/seo/research';
 
-export async function research({ storeId, keyword, type = 'collection', platform }: { storeId: string; keyword: string; type?: string; platform?: string }) {
+export async function research({ storeId, keyword, type = 'collection', platform, brandVoice }: { storeId: string; keyword: string; type?: string; platform?: string; brandVoice?: any }) {
   const tavilyRes = await fetch('https://api.tavily.com/search', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -14,7 +14,7 @@ export async function research({ storeId, keyword, type = 'collection', platform
     }),
   });
   const data = await tavilyRes.json();
-  const allMsgs = buildResearchMessages({ keyword, type, searchData: data, platform });
+  const allMsgs = buildResearchMessages({ keyword, type, searchData: data, brandVoice, platform });
   const sys = allMsgs.find(m => m.role === 'system')?.content;
   const userMsgs = allMsgs.filter(m => m.role !== 'system');
   const { text } = await generateText({
@@ -22,5 +22,5 @@ export async function research({ storeId, keyword, type = 'collection', platform
     system: sys,
     messages: userMsgs,
   });
-  return { keyword, summary: text, raw: data, type };
+  return { keyword, summary: text, raw: data, type, brandVoice };
 }

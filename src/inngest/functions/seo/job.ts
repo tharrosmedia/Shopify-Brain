@@ -13,15 +13,17 @@ import { saveApprovalFn } from './save-approval';
 import { publishFn } from './publish';
 import { updateJobStatus } from '../../../lib/db/jobs';
 import { logEvent } from '../../../lib/brain/events';
+import { getStore } from '../../../lib/db/stores';
 
 export const seoJob = inngest.createFunction(
   { id: 'seo-job', retries: 2, triggers: [{ event: 'seo/job.requested' }] },
   async ({ event, step }: any) => {
-    const data = event.data as { storeId: string; keyword: string; jobId?: string; job_id?: string; type?: string; platform?: string };
+    const data = event.data as { storeId: string; keyword: string; jobId?: string; job_id?: string; type?: string; platform?: string; brandVoice?: any };
     const storeId = data.storeId;
     const keyword = data.keyword;
     const type = data.type || 'collection';
     const platform = data.platform || 'shopify';
+    const brandVoice = data.brandVoice;
     const providedJobId = data.jobId || data.job_id;
     const jobId = providedJobId || 'unknown';
 
@@ -51,7 +53,7 @@ export const seoJob = inngest.createFunction(
     try {
       job = await step.invoke('ensure-job', {
         function: ensureJob,
-        data: { storeId, keyword, type, platform, jobId: providedJobId },
+        data: { storeId, keyword, type, platform, brandVoice, jobId: providedJobId },
       });
     } catch (err: any) {
       console.error('SEO job failed at ensure', err);
@@ -78,55 +80,55 @@ export const seoJob = inngest.createFunction(
       try {
         researchResult = await step.invoke('research', {
           function: researchFn,
-          data: { storeId, keyword, type, platform },
+          data: { storeId, keyword, type, platform, brandVoice },
         });
       } catch (err: any) {
         await step.invoke('log-research-fail', {
           function: logEventFn,
           data: { storeId, actor: 'system', action: 'research.failed', payload: { error: err.message || String(err) }, jobId: job.id },
         });
-        researchResult = { keyword, summary: `Basic research summary for ${type} about ${keyword}.`, raw: {}, type, platform };
+        researchResult = { keyword, summary: `Basic research summary for ${type} about ${keyword}.`, raw: {}, type, platform, brandVoice };
       }
 
       try {
         brief = await step.invoke('create-brief', {
           function: createBriefFn,
-          data: { storeId, keyword, research: researchResult, type, platform },
+          data: { storeId, keyword, research: researchResult, type, platform, brandVoice },
         });
       } catch (err: any) {
         await step.invoke('log-brief-fail', {
           function: logEventFn,
           data: { storeId, actor: 'system', action: 'brief.failed', payload: { error: err.message || String(err) }, jobId: job.id },
         });
-        brief = { keyword, type, platform, intent: 'informational commercial', sections: ['intro'], researchSummary: '' };
+        brief = { keyword, type, platform, brandVoice, intent: 'informational commercial', sections: ['intro'], researchSummary: '' };
       }
 
       try {
         draft = await step.invoke('write', {
           function: writeDraftFn,
-          data: { storeId, brief, type, platform },
+          data: { storeId, brief, type, platform, brandVoice },
         });
       } catch (err: any) {
         await step.invoke('log-write-fail', {
           function: logEventFn,
           data: { storeId, actor: 'system', action: 'write.failed', payload: { error: err.message || String(err) }, jobId: job.id },
         });
-        draft = createBasicDraft(type, keyword, platform);
+        draft = createBasicDraft(type, keyword, platform, brandVoice);
       }
 
       edited = await step.invoke('edit', {
         function: editDraftFn,
-        data: { storeId, draft, type, platform },
+        data: { storeId, draft, type, platform, brandVoice },
       });
 
       optimized = await step.invoke('optimize', {
         function: optimizeDraftFn,
-        data: { storeId, draft: edited, type, platform },
+        data: { storeId, draft: edited, type, platform, brandVoice },
       });
 
       scores = await step.invoke('evaluate', {
         function: evaluateFn,
-        data: { draft: optimized, type, platform },
+        data: { draft: optimized, type, platform, brandVoice },
       });
 
       draftRecord = await step.invoke('save-draft', {
@@ -222,7 +224,7 @@ export const seoJob = inngest.createFunction(
 
       const result = await step.invoke('publish', {
         function: publishFn,
-        data: { storeId, draft: finalDraft, type, platform },
+        data: { storeId, draft: finalDraft, type, platform, brandVoice },
       });
 
       await step.invoke('update-job-completed', {
@@ -256,7 +258,7 @@ export const seoJob = inngest.createFunction(
   }
 );
 
-function createBasicDraft(type: string, keyword: string, platform = 'shopify') {
+function createBasicDraft(type: string, keyword: string, platform = 'shopify', brandVoice?: any) {
   const suffix = type === 'collection' ? ' | Collection' : type === 'page' ? ' | Page' : ' | Blog';
   const plat = platform ? `${platform} ` : '';
   return {
@@ -266,5 +268,6 @@ function createBasicDraft(type: string, keyword: string, platform = 'shopify') {
     metaTitle: keyword,
     metaDescription: `Learn about ${keyword} in this ${type}.`,
     type,
+    brandVoice,
   };
 }

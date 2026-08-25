@@ -8,6 +8,7 @@ await inngest.send({
     storeId,
     keyword: 'daikin single zone mini split',
     type: 'collection',
+    brandVoice: { text: 'Professional, helpful, benefit-focused for HVAC.' },
   },
 });
 console.log('Triggered for keyword daikin single zone mini split (type: collection)');

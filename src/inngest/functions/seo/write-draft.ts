@@ -4,9 +4,9 @@ import { writeDraft } from '../../../lib/agents/seo/writer';
 export const writeDraftFn = inngest.createFunction(
   { id: 'seo-write-draft', retries: 2, triggers: [{ event: 'seo/write-draft' }] },
   async ({ event, step }: any) => {
-    const { storeId, brief, type = 'collection', platform } = event.data;
+    const { storeId, brief, type = 'collection', platform, brandVoice } = event.data;
     return await step.run('write-draft', async () => {
-      return writeDraft({ storeId, brief, type, platform });
+      return writeDraft({ storeId, brief, type, platform, brandVoice });
     });
   }
 );
