@@ -1,12 +1,13 @@
 
 
-export async function getFirstBlogId(adminClient: any): Promise<string> {
+export async function getFirstBlog(adminClient: any): Promise<{ id: string; handle: string }> {
   const query = `
     query getFirstBlog {
       blogs(first: 1) {
         edges {
           node {
             id
+            handle
           }
         }
       }
@@ -17,6 +18,11 @@ export async function getFirstBlogId(adminClient: any): Promise<string> {
   if (!blog?.id) {
     throw new Error('No blogs found in this Shopify store. Create at least one blog to publish blog posts.');
   }
+  return { id: blog.id, handle: blog.handle || 'news' };
+}
+
+export async function getFirstBlogId(adminClient: any): Promise<string> {
+  const blog = await getFirstBlog(adminClient);
   return blog.id;
 }
 

@@ -32,3 +32,28 @@ export async function createAndPublishPage(adminClient: any, input: { title: str
 
 // Back-compat alias
 export const createDraftPage = createAndPublishPage;
+
+export async function updatePage(adminClient: any, id: string, input: { title?: string; handle?: string; bodyHtml?: string }) {
+  const mutation = `
+    mutation updatePage($id: ID!, $input: PageInput!) {
+      pageUpdate(id: $id, input: $input) {
+        page { id handle }
+        userErrors { field message }
+      }
+    }
+  `;
+  const variables = {
+    id,
+    input: {
+      title: input.title,
+      handle: input.handle,
+      body: input.bodyHtml || '',
+    },
+  };
+  const response = await adminClient.request(mutation, { variables });
+  const errors = response?.data?.pageUpdate?.userErrors || [];
+  if (errors.length) {
+    throw new Error(errors.map((e: any) => e.message).join('; '));
+  }
+  return response;
+}

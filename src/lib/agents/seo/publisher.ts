@@ -18,7 +18,7 @@ function getSourceValue(draft: any, source: string): any {
 }
 
 function getResourceId(response: any, type: string): string | null {
-  if (type === 'page') return response?.data?.pageCreate?.page?.id || null;
+  if (type === 'page') return response?.data?.pageCreate?.page?.id || response?.data?.pageUpdate?.page?.id || null;
   if (type === 'blog') return response?.data?.articleCreate?.article?.id || null;
   return response?.data?.collectionCreate?.collection?.id || null;
 }
@@ -74,7 +74,23 @@ export async function publishContent({ storeId, draft, type = 'collection', plat
   }
   let response;
   if (type === 'page') {
-    response = await createAndPublishPage(client, mainInput);
+    // try update existing by handle
+    let updated = false;
+    if (mainInput.handle) {
+      try {
+        const findQ = `query { pages(first:1, query:"handle:${mainInput.handle}") { edges { node { id } } } }`;
+        const findRes = await client.request(findQ, {});
+        const existing = findRes?.data?.pages?.edges?.[0]?.node;
+        if (existing?.id) {
+          const { updatePage } = await import('../../shopify/pages');
+          response = await updatePage(client, existing.id, mainInput);
+          updated = true;
+        }
+      } catch {}
+    }
+    if (!updated) {
+      response = await createAndPublishPage(client, mainInput);
+    }
   } else if (type === 'blog') {
     response = await createAndPublishArticle(client, mainInput);
   } else {

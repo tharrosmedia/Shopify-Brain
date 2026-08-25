@@ -1,6 +1,7 @@
 import { neon } from '@neondatabase/serverless';
 import 'dotenv/config';
 import { encrypt, decrypt } from '../encryption';
+import { cookies } from 'next/headers';
 
 export async function listStores() {
   const sql = neon(process.env.DATABASE_URL!);
@@ -39,4 +40,15 @@ export async function updateStore(id: string, { name, shopify_domain, shopify_ac
     const result = await sql`UPDATE stores SET name = ${name}, shopify_domain = ${shopify_domain}, platform = ${platform}, config = ${config !== undefined ? config : null}, updated_at = now() WHERE id = ${id} RETURNING id, name, shopify_domain, platform, config, created_at`;
     return result[0];
   }
+}
+
+export async function getActiveStoreId(): Promise<string | null> {
+  const cookieStore = await cookies();
+  let storeId = cookieStore.get('activeStoreId')?.value || process.env.DEV_STORE_ID || null;
+  const stores = await listStores();
+  if (!storeId || storeId === 'undefined' || !stores.some((s: any) => s.id === storeId)) {
+    if (stores.length === 0) return null;
+    storeId = stores[0].id;
+  }
+  return storeId;
 }

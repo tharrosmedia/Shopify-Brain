@@ -4,41 +4,35 @@ import { listJobs } from '@/src/lib/db/jobs';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { cookies } from 'next/headers';
-import { listStores } from '@/src/lib/db/stores';
+import { listStores, getActiveStoreId } from '@/src/lib/db/stores';
 import AutoRefresh from '@/components/auto-refresh';
+import { redirect } from 'next/navigation';
 
 async function triggerJob(formData: FormData) {
   'use server';
   const keyword = formData.get('keyword') as string;
   const type = (formData.get('type') as string) || 'collection';
   if (!keyword) return;
-  const cookieStore = await cookies();
-  let storeId = cookieStore.get('activeStoreId')?.value || process.env.DEV_STORE_ID || '11111111-1111-1111-1111-111111111111';
-  let platform = 'shopify';
-  let brandVoice: any = undefined;
-  let autonomy: any = undefined;
-  if (!storeId || storeId === 'undefined') {
-    const stores = await listStores();
-    storeId = stores[0]?.id || '11111111-1111-1111-1111-111111111111';
-    platform = stores[0]?.platform || 'shopify';
-    brandVoice = stores[0]?.config?.brandVoice;
-    autonomy = stores[0]?.config?.autonomy;
-  } else {
-    const stores = await listStores();
-    const current = stores.find((s: any) => s.id === storeId) || stores[0];
-    platform = current?.platform || 'shopify';
-    brandVoice = current?.config?.brandVoice;
-    autonomy = current?.config?.autonomy;
+  let storeId = await getActiveStoreId();
+  if (!storeId) {
+    redirect('/stores?error=no-store');
   }
+  const stores = await listStores();
+  const current = stores.find((s: any) => s.id === storeId) || stores[0];
+  const platform = current?.platform || 'shopify';
+  const brandVoice = current?.config?.brandVoice;
+  const autonomy = current?.config?.autonomy;
   if (autonomy?.allowedTypes && !autonomy.allowedTypes.includes(type)) {
     throw new Error(`Type ${type} not allowed for this store per autonomy config`);
   }
   const c = await cookies();
-  c.set('activeStoreId', storeId, {
-    path: '/',
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
-  });
+  if (storeId) {
+    c.set('activeStoreId', storeId, {
+      path: '/',
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+    });
+  }
   const job = await createJob({ storeId, domain: 'seo', type, input: { keyword, platform, brandVoice }, status: 'queued' });
   console.log('[INNGEST] sending seo/job.requested', { jobId: job.id, type, hasEventKey: !!process.env.INNGEST_EVENT_KEY });
   try {
@@ -61,13 +55,12 @@ async function triggerJob(formData: FormData) {
 export const dynamic = 'force-dynamic';
 
 export default async function Dashboard() {
-  const cookieStore = await cookies();
-  let storeId = cookieStore.get('activeStoreId')?.value || process.env.DEV_STORE_ID || '11111111-1111-1111-1111-111111111111';
+  let storeId = await getActiveStoreId();
   const allStores = await listStores();
-  if (!storeId || storeId === 'undefined') {
-    storeId = allStores[0]?.id || '11111111-1111-1111-1111-111111111111';
-    if (allStores[0]) {
-      const c = await cookies();
+  if (!storeId && allStores.length > 0) {
+    storeId = allStores[0].id;
+    const c = await cookies();
+    if (storeId) {
       c.set('activeStoreId', storeId, {
         path: '/',
         secure: process.env.NODE_ENV === 'production',
@@ -78,7 +71,9 @@ export default async function Dashboard() {
   let jobs: any[] = [];
   let loadError: string | null = null;
   try {
-    jobs = await listJobs(storeId, 20);
+    if (storeId) {
+      jobs = await listJobs(storeId, 20);
+    }
   } catch (e: any) {
     loadError = e.message || 'Failed to load jobs';
   }

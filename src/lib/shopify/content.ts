@@ -1,4 +1,4 @@
-import { getFirstBlogId } from './blogs';
+import { getFirstBlog } from './blogs';
 
 export async function fetchStoreSamples(adminClient: any, limit = 5) {
   const samples: Array<{ title: string; body: string }> = [];
@@ -63,10 +63,10 @@ export async function fetchStoreSamples(adminClient: any, limit = 5) {
   } catch {}
 
   try {
-    const blogId = await getFirstBlogId(adminClient);
+    const blog = await getFirstBlog(adminClient);
     const artQ = `
       query {
-        blog(id: "${blogId}") {
+        blog(id: "${blog.id}") {
           articles(first: 3) {
             edges { node { title bodyHtml } }
           }
@@ -98,4 +98,34 @@ export async function searchBrandContext(shopDomain: string, storeName?: string)
     }),
   });
   return await res.json();
+}
+
+export async function fetchMetafieldDefinitions(adminClient: any) {
+  const ownerTypes = ['COLLECTION', 'PAGE', 'ARTICLE', 'PRODUCT', 'SHOP'];
+  const defs: any[] = [];
+  for (const ot of ownerTypes) {
+    try {
+      const q = `
+        query {
+          metafieldDefinitions(first: 50, ownerType: ${ot}) {
+            edges {
+              node {
+                namespace
+                key
+                name
+                description
+                type { name }
+              }
+            }
+          }
+        }
+      `;
+      const res = await adminClient.request(q, {});
+      const edges = res?.data?.metafieldDefinitions?.edges || [];
+      edges.forEach((e: any) => {
+        defs.push({ ...e.node, ownerType: ot });
+      });
+    } catch {}
+  }
+  return defs;
 }

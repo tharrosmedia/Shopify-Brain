@@ -141,6 +141,8 @@ export const seoJob = inngest.createFunction(
           bodyHtml: optimized.bodyHtml,
           metaTitle: optimized.metaTitle,
           metaDescription: optimized.metaDescription,
+          metafields: optimized.metafields,
+          schemaJsonLd: optimized.schemaJsonLd,
           evaluationScores: scores,
           rawResearch: researchResult,
         },

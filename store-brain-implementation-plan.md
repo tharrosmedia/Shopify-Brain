@@ -66,4 +66,10 @@ Success for Stage A: trigger SEO job for a keyword → research → draft → hu
 
 ## Progress Tracking
 - See git log and code for completed items.
-- Next: richer draft editing, full autonomy auto, etc.
+- Alpha sprint: DEV fallbacks cleaned (central getActiveStoreId, triggers require store).
+- Richer drafts: data flow updated for metafields/schemaJsonLd; UI supports full JSON edit + dynamic defs display (fetched comprehensive across types, filtered); editedPayload carries rich.
+- Edit existing: handle-based update attempted for pages (overwrite OK); added updatePage.
+- Links: blog handle resolved (getFirstBlog returns handle); job output shows basic links (storefront/admin).
+- Next: full links polish, autonomy auto, update plan.
+
+Alpha now supports editing rich drafts (metafields from site), updating existing pages, better visibility.

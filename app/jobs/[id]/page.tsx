@@ -4,7 +4,7 @@ import { listEventsByJob } from '@/src/lib/brain/events';
 import { getDraftByJobId } from '@/src/lib/db/drafts';
 import Link from 'next/link';
 import { cookies } from 'next/headers';
-import { listStores } from '@/src/lib/db/stores';
+import { listStores, getActiveStoreId, getStore } from '@/src/lib/db/stores';
 import { notFound } from 'next/navigation';
 import { inngest } from '@/src/inngest/client';
 
@@ -34,11 +34,12 @@ async function requeueJob(formData: FormData) {
 
 export default async function JobDetail({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const cookieStore = await cookies();
-  let storeId = cookieStore.get('activeStoreId')?.value || process.env.DEV_STORE_ID || '11111111-1111-1111-1111-111111111111';
-  if (!storeId || storeId === 'undefined') {
+  let storeId = await getActiveStoreId();
+  if (!storeId) {
     const stores = await listStores();
-    storeId = stores[0]?.id || '11111111-1111-1111-1111-111111111111';
+    if (stores.length > 0) {
+      storeId = stores[0].id;
+    }
   }
 
   let job: any = null;
@@ -46,6 +47,7 @@ export default async function JobDetail({ params }: { params: Promise<{ id: stri
   let events: any[] = [];
   let draft: any = null;
   let loadError: string | null = null;
+  let domain = 'your-store.myshopify.com';
   try {
     job = await getJob(id);
     if (job && job.storeId === storeId) {
@@ -56,6 +58,10 @@ export default async function JobDetail({ params }: { params: Promise<{ id: stri
       if (job.status === 'awaiting_approval') {
         draft = await getDraftByJobId(id);
       }
+    }
+    if (storeId) {
+      const s = await getStore(storeId);
+      if (s?.shopify_domain) domain = s.shopify_domain;
     }
   } catch (e: any) {
     loadError = e.message || 'Failed to load job';
@@ -150,7 +156,21 @@ export default async function JobDetail({ params }: { params: Promise<{ id: stri
       <div>
         <h2 className="font-semibold mb-2">Final Output</h2>
         {job.output ? (
-          <pre className="bg-muted p-4 text-xs overflow-auto max-h-96">{JSON.stringify(job.output, null, 2)}</pre>
+          <>
+            <pre className="bg-muted p-4 text-xs overflow-auto max-h-96">{JSON.stringify(job.output, null, 2)}</pre>
+            {/* Constructed links */}
+            {(() => {
+              const out = job.output?.data || job.output;
+              const coll = out?.collectionCreate?.collection || out?.pageUpdate?.page || out?.pageCreate?.page;
+              const art = out?.articleCreate?.article;
+              const pg = out?.pageCreate?.page || out?.pageUpdate?.page;
+              const links: string[] = [];
+              if (coll?.handle) links.push(`Storefront: https://${domain}/collections/${coll.handle}`);
+              if (pg?.handle) links.push(`Storefront: https://${domain}/pages/${pg.handle}`);
+              if (art?.handle) links.push(`Storefront: https://${domain}/blogs/news/${art.handle} (blog handle may vary)`);
+              return links.length ? <div className="mt-2 text-xs"><strong>Links:</strong> {links.map((l,i)=><div key={i}>{l}</div>)}</div> : null;
+            })()}
+          </>
         ) : (
           <div className="text-muted-foreground">No output yet. Current status: {job.status}</div>
         )}

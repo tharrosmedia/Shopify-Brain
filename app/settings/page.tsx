@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { cookies } from 'next/headers';
-import { listStores, getStore, updateStore } from '@/src/lib/db/stores';
+import { listStores, getStore, updateStore, getActiveStoreId } from '@/src/lib/db/stores';
 import { inferBrandVoice } from '@/src/lib/agents/brand/voice';
 
 async function resyncInngest() {
@@ -30,12 +30,7 @@ async function resyncInngest() {
 }
 
 async function getActiveStore() {
-  const cookieStore = await cookies();
-  let storeId = cookieStore.get('activeStoreId')?.value || process.env.DEV_STORE_ID;
-  if (!storeId || storeId === 'undefined') {
-    const stores = await listStores();
-    storeId = stores[0]?.id;
-  }
+  let storeId = await getActiveStoreId();
   if (!storeId) return null;
   return await getStore(storeId);
 }

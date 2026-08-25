@@ -4,6 +4,9 @@ import { inngest } from '@/src/inngest/client';
 import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
+import { getActiveStoreId, getStore } from '@/src/lib/db/stores';
+import { createAdminClient } from '@/src/lib/shopify/client';
+import { fetchMetafieldDefinitions } from '@/src/lib/shopify/content';
 
 async function decide(formData: FormData) {
   'use server';
@@ -11,18 +14,25 @@ async function decide(formData: FormData) {
   const status = formData.get('status') as string;
   const notes = formData.get('notes') as string || '';
   const jobId = formData.get('jobId') as string;
-  const cookieStore = await cookies();
-  let storeId = cookieStore.get('activeStoreId')?.value || process.env.DEV_STORE_ID || '11111111-1111-1111-1111-111111111111';
-  if (!storeId || storeId === 'undefined') storeId = '11111111-1111-1111-1111-111111111111';
+  let storeId = await getActiveStoreId();
+  if (!storeId) storeId = null as any; // will be handled if needed, but draft load uses id
 
   let editedPayload: any = undefined;
   if (status === 'edited') {
+    let metafields = undefined;
+    const mfStr = formData.get('metafields') as string;
+    if (mfStr) { try { metafields = JSON.parse(mfStr); } catch {} }
+    let schemaJsonLd = undefined;
+    const sjStr = formData.get('schemaJsonLd') as string;
+    if (sjStr) { try { schemaJsonLd = JSON.parse(sjStr); } catch {} }
     editedPayload = {
       title: formData.get('title'),
       handle: formData.get('handle'),
       bodyHtml: formData.get('bodyHtml'),
       metaTitle: formData.get('metaTitle'),
       metaDescription: formData.get('metaDescription'),
+      metafields,
+      schemaJsonLd,
     };
   }
 
@@ -68,6 +78,18 @@ export default async function DraftDetail({ params }: { params: Promise<{ id: st
   }
   if (!draft) notFound();
 
+  let availableMetafields: any[] = [];
+  try {
+    const sid = await getActiveStoreId();
+    if (sid) {
+      const s = await getStore(sid);
+      if (s && s.shopify_access_token) {
+        const client = createAdminClient(s.shopify_domain, s.shopify_access_token);
+        availableMetafields = await fetchMetafieldDefinitions(client);
+      }
+    }
+  } catch {}
+
   return (
     <div className="p-8 max-w-4xl mx-auto">
       <Link href="/review" className="underline">← Back to Review</Link>
@@ -86,6 +108,17 @@ export default async function DraftDetail({ params }: { params: Promise<{ id: st
         <div>Meta Title: {draft.metaTitle}</div>
         <div>Meta Desc: {draft.metaDescription}</div>
       </div>
+
+      {availableMetafields.length > 0 && (
+        <div className="mb-6 text-xs">
+          <div className="font-medium mb-1">Available Metafields on store (filtered by type in editor):</div>
+          <div className="max-h-20 overflow-auto border p-1 bg-muted">
+            {availableMetafields.slice(0, 20).map((d: any, i: number) => (
+              <span key={i} className="mr-2">{d.namespace}.{d.key} </span>
+            ))}
+          </div>
+        </div>
+      )}
 
       <form action={decide} className="space-y-4 border p-4 rounded">
         <input type="hidden" name="draftId" value={draft.id} />
@@ -112,6 +145,8 @@ export default async function DraftDetail({ params }: { params: Promise<{ id: st
           <input name="metaTitle" defaultValue={draft.metaTitle} placeholder="Meta Title" className="border p-1 w-full mb-2" />
           <input name="metaDescription" defaultValue={draft.metaDescription} placeholder="Meta Desc" className="border p-1 w-full mb-2" />
           <textarea name="bodyHtml" defaultValue={draft.bodyHtml} className="border p-1 w-full h-40" />
+          <textarea name="metafields" defaultValue={draft.metafields ? JSON.stringify(draft.metafields, null, 2) : ''} placeholder='Metafields JSON e.g. {"global.title_tag": "value"}' className="border p-1 w-full h-20 font-mono text-xs mt-2" />
+          <textarea name="schemaJsonLd" defaultValue={draft.schemaJsonLd ? JSON.stringify(draft.schemaJsonLd, null, 2) : ''} placeholder='Schema JSON-LD' className="border p-1 w-full h-20 font-mono text-xs mt-1" />
         </div>
 
         <button type="submit" className="bg-black text-white px-6 py-2">Submit Decision</button>

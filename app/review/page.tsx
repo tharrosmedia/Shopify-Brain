@@ -1,29 +1,33 @@
 import { listDrafts } from '@/src/lib/db/drafts';
 import Link from 'next/link';
 import { cookies } from 'next/headers';
-import { listStores } from '@/src/lib/db/stores';
+import { listStores, getActiveStoreId } from '@/src/lib/db/stores';
 
 export const dynamic = 'force-dynamic';
 
 export default async function Review({ searchParams }: { searchParams: Promise<{ success?: string }> }) {
   const params = await searchParams;
+  let storeId = await getActiveStoreId();
   const cookieStore = await cookies();
-  let storeId = cookieStore.get('activeStoreId')?.value || process.env.DEV_STORE_ID || '11111111-1111-1111-1111-111111111111';
-  if (!storeId || storeId === 'undefined') {
+  if (!storeId) {
     const stores = await listStores();
-    storeId = stores[0]?.id || '11111111-1111-1111-1111-111111111111';
-    if (stores[0]) {
-      cookieStore.set('activeStoreId', storeId, {
-        path: '/',
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-      });
+    if (stores.length > 0) {
+      storeId = stores[0].id;
+      if (storeId) {
+        cookieStore.set('activeStoreId', storeId, {
+          path: '/',
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'lax',
+        });
+      }
     }
   }
   let drafts: any[] = [];
   let loadError: string | null = null;
   try {
-    drafts = await listDrafts(storeId, 'awaiting_approval', 20);
+    if (storeId) {
+      drafts = await listDrafts(storeId, 'awaiting_approval', 20);
+    }
   } catch (e: any) {
     loadError = e.message || 'Failed to load drafts';
   }

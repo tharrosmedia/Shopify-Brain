@@ -14,6 +14,8 @@ export const saveDraftFn = inngest.createFunction(
         bodyHtml: data.bodyHtml,
         metaTitle: data.metaTitle,
         metaDescription: data.metaDescription,
+        metafields: data.metafields,
+        schemaJsonLd: data.schemaJsonLd,
         evaluationScores: data.evaluationScores,
         rawResearch: data.rawResearch,
       });
