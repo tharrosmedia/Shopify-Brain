@@ -1,5 +1,5 @@
 import { getDraft } from '@/src/lib/db/drafts';
-import { updateJobStatus } from '@/src/lib/db/jobs';
+import { updateJobStatus, getJob } from '@/src/lib/db/jobs';
 import { inngest } from '@/src/inngest/client';
 import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
@@ -78,6 +78,12 @@ export default async function DraftDetail({ params }: { params: Promise<{ id: st
   }
   if (!draft) notFound();
 
+  let brandVoice: any = null;
+  try {
+    const job = await getJob(draft.jobId);
+    brandVoice = job?.input?.brandVoice || null;
+  } catch {}
+
   let availableMetafields: any[] = [];
   try {
     const sid = await getActiveStoreId();
@@ -96,6 +102,9 @@ export default async function DraftDetail({ params }: { params: Promise<{ id: st
       {' | '}
       <Link href={`/jobs/${draft.jobId}`} className="underline">← Back to Job</Link>
       <h1 className="text-2xl font-bold mt-4 mb-2">{draft.title}</h1>
+      {brandVoice && (
+        <div className="text-xs mb-2 text-muted-foreground">Brand Voice: {brandVoice.text || JSON.stringify(brandVoice)}</div>
+      )}
       <p className="text-sm text-muted-foreground mb-4">Handle: {draft.handle} | Job: {draft.jobId}</p>
       <p className="text-sm mb-4"><Link href={`/jobs/${draft.jobId}`} className="underline">View full job audit</Link></p>
 

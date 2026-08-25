@@ -175,27 +175,63 @@ export const seoJob = inngest.createFunction(
       throw err;
     }
 
-    const approval = await step.waitForEvent('wait-for-approval', {
-      event: 'approval/decided',
-      timeout: '1d',
-      match: 'data.jobId',
-    });
-    const approvalData = (approval as any)?.data || {};
-
-    if (!approval || !approvalData.status) {
-      await step.invoke('log-timeout', {
-        function: logEventFn,
-        data: { storeId, actor: 'system', action: 'job.timeout', payload: {}, jobId: job.id },
-      });
-      if (job?.id) {
-        try {
-          await step.invoke('update-timeout', {
-            function: updateJobStatusFn,
-            data: { jobId: job.id, status: 'failed' },
+    // 'awaiting_approval' was briefly set above (visible in UI/queues).
+    // Now decide: wait for human or auto-approve per store autonomy.
+    let approvalData: any = {};
+    try {
+      const store = await getStore(storeId);
+      const requireApproval = store?.config?.autonomy?.requireApproval !== false;
+      if (requireApproval) {
+        const approval = await step.waitForEvent('wait-for-approval', {
+          event: 'approval/decided',
+          timeout: '1d',
+          match: 'data.jobId',
+        });
+        approvalData = (approval as any)?.data || {};
+        if (!approval || !approvalData.status) {
+          await step.invoke('log-timeout', {
+            function: logEventFn,
+            data: { storeId, actor: 'system', action: 'job.timeout', payload: {}, jobId: job.id },
           });
-        } catch {}
+          if (job?.id) {
+            try {
+              await step.invoke('update-timeout', {
+                function: updateJobStatusFn,
+                data: { jobId: job.id, status: 'failed' },
+              });
+            } catch {}
+          }
+          return { status: 'no-decision' };
+        }
+      } else {
+        approvalData = {
+          status: 'approved',
+          notes: 'Auto-approved per store autonomy config (requireApproval=false)',
+        };
       }
-      return { status: 'no-decision' };
+    } catch (e: any) {
+      // Safe fallback: require human approval
+      const approval = await step.waitForEvent('wait-for-approval', {
+        event: 'approval/decided',
+        timeout: '1d',
+        match: 'data.jobId',
+      });
+      approvalData = (approval as any)?.data || {};
+      if (!approval || !approvalData.status) {
+        await step.invoke('log-timeout', {
+          function: logEventFn,
+          data: { storeId, actor: 'system', action: 'job.timeout', payload: {}, jobId: job.id },
+        });
+        if (job?.id) {
+          try {
+            await step.invoke('update-timeout', {
+              function: updateJobStatusFn,
+              data: { jobId: job.id, status: 'failed' },
+            });
+          } catch {}
+        }
+        return { status: 'no-decision' };
+      }
     }
 
     try {
@@ -209,9 +245,10 @@ export const seoJob = inngest.createFunction(
           editedPayload: approvalData.editedPayload,
         },
       });
+      const actor = approvalData.notes && approvalData.notes.includes('Auto-approved') ? 'system' : 'human';
       await step.invoke('log-approval', {
         function: logEventFn,
-        data: { storeId, actor: 'human', action: 'approval.' + approvalData.status, payload: approvalData, jobId: job.id },
+        data: { storeId, actor, action: 'approval.' + approvalData.status, payload: approvalData, jobId: job.id },
       });
 
       if (approvalData.status === 'rejected') {

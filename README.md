@@ -83,6 +83,16 @@ Full details (Stage A exit criteria, data model, agent steps, Inngest skeleton, 
 - **Stage B**: Minimal command center + second domain
 - **Stage C**: Multi-domain + multi-store polish
 
+### Alpha Progress (current)
+- Per-store config (placement, brandVoice, autonomy)
+- Brand voice inference + editing + threading to agents
+- Richer draft editing (metafields, schema, dynamic form, edit existing pages)
+- Autonomy auto-approve path (with brief awaiting state)
+- Requeue consistency (brandVoice/platform)
+- Brand voice surfaced in draft views
+- Published links: storefront + admin (numeric GID-based) in job + history
+- DEV cleanup and robust store selection
+
 ## Contributing
 - Keep functions small/pure, explicit `storeId` everywhere.
 - Prompts live in `lib/prompts/`.

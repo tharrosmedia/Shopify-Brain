@@ -70,6 +70,10 @@ Success for Stage A: trigger SEO job for a keyword → research → draft → hu
 - Richer drafts: data flow updated for metafields/schemaJsonLd; UI supports full JSON edit + dynamic defs display (fetched comprehensive across types, filtered); editedPayload carries rich.
 - Edit existing: handle-based update attempted for pages (overwrite OK); added updatePage.
 - Links: blog handle resolved (getFirstBlog returns handle); job output shows basic links (storefront/admin).
-- Next: full links polish, autonomy auto, update plan.
+- Autonomy: full auto-approve (briefly sets awaiting_approval then auto-transitions when requireApproval=false; human path unchanged).
+- Requeues: now forward fresh brandVoice + platform from store config.
+- Brand voice surfaced in draft detail (fetched via job).
+- Links polished: admin GIDs (numeric IDs) + storefront for all types; light constructed links in history.
+- Updated plan + README alpha checklist.
 
-Alpha now supports editing rich drafts (metafields from site), updating existing pages, better visibility.
+Alpha now supports richer editing, existing page updates, auto-approve via autonomy config, better brand voice visibility, and improved published links (storefront + admin).

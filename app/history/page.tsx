@@ -1,7 +1,7 @@
 import { listJobs } from '@/src/lib/db/jobs';
 import Link from 'next/link';
 import { cookies } from 'next/headers';
-import { listStores, getActiveStoreId } from '@/src/lib/db/stores';
+import { listStores, getActiveStoreId, getStore } from '@/src/lib/db/stores';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,9 +23,12 @@ export default async function History() {
   }
   let jobs: any[] = [];
   let loadError: string | null = null;
+  let domain = 'your-store.myshopify.com';
   try {
     if (storeId) {
       jobs = await listJobs(storeId, 50);
+      const s = await getStore(storeId);
+      if (s?.shopify_domain) domain = s.shopify_domain;
     }
   } catch (e: any) {
     loadError = e.message || 'Failed to load history';
@@ -59,7 +62,28 @@ export default async function History() {
               <td className="p-2">{JSON.stringify(j.input)}</td>
               <td className="p-2 text-center">{j.status}</td>
               <td className="p-2">{new Date(j.createdAt).toLocaleDateString()}</td>
-              <td className="p-2 text-xs max-w-xs truncate">{j.output ? JSON.stringify(j.output).slice(0,100) : '-'}</td>
+              <td className="p-2 text-xs max-w-xs">
+                {j.output ? (
+                  <>
+                    <div className="truncate">{JSON.stringify(j.output).slice(0,80)}</div>
+                    {(() => {
+                      const out = j.output?.data || j.output;
+                      const coll = out?.collectionCreate?.collection || out?.pageUpdate?.page || out?.pageCreate?.page;
+                      const art = out?.articleCreate?.article;
+                      const pg = out?.pageCreate?.page || out?.pageUpdate?.page;
+                      const adminSlug = domain.replace(/\.myshopify\.com$/, '');
+                      const links: string[] = [];
+                      if (coll?.handle) links.push(`SF: /collections/${coll.handle}`);
+                      if (coll?.id) { const n = String(coll.id).split('/').pop(); if (n) links.push(`Admin: /collections/${n}`); }
+                      if (pg?.handle) links.push(`SF: /pages/${pg.handle}`);
+                      if (pg?.id) { const n = String(pg.id).split('/').pop(); if (n) links.push(`Admin: /pages/${n}`); }
+                      if (art?.handle) links.push(`SF: /blogs/news/${art.handle}`);
+                      if (art?.id) { const n = String(art.id).split('/').pop(); if (n) links.push(`Admin: /articles/${n}`); }
+                      return links.length ? <div className="text-[10px] mt-0.5 text-blue-600">{links.join(' | ')}</div> : null;
+                    })()}
+                  </>
+                ) : '-'}
+              </td>
               <td className="p-2"><Link href={`/jobs/${j.id}`} className="underline">View</Link></td>
             </tr>
           ))}

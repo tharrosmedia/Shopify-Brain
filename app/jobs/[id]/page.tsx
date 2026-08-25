@@ -18,10 +18,14 @@ async function requeueJob(formData: FormData) {
   const type = (formData.get('type') as string) || 'collection';
   try {
     await updateJobStatus(jobId, 'queued');
+    const stores = await listStores();
+    const current = stores.find((s: any) => s.id === storeId) || stores[0];
+    const platform = current?.platform || 'shopify';
+    const brandVoice = current?.config?.brandVoice;
     console.log('[INNGEST] re-sending seo/job.requested', { jobId, type, hasEventKey: !!process.env.INNGEST_EVENT_KEY });
     await inngest.send({
       name: 'seo/job.requested',
-      data: { storeId, keyword, type, jobId },
+      data: { storeId, keyword, type, platform, brandVoice, jobId },
     });
     console.log('[INNGEST] re-send completed for', jobId);
     const { revalidatePath } = await import('next/cache');
@@ -164,10 +168,23 @@ export default async function JobDetail({ params }: { params: Promise<{ id: stri
               const coll = out?.collectionCreate?.collection || out?.pageUpdate?.page || out?.pageCreate?.page;
               const art = out?.articleCreate?.article;
               const pg = out?.pageCreate?.page || out?.pageUpdate?.page;
+              const adminSlug = domain.replace(/\.myshopify\.com$/, '');
               const links: string[] = [];
-              if (coll?.handle) links.push(`Storefront: https://${domain}/collections/${coll.handle}`);
-              if (pg?.handle) links.push(`Storefront: https://${domain}/pages/${pg.handle}`);
-              if (art?.handle) links.push(`Storefront: https://${domain}/blogs/news/${art.handle} (blog handle may vary)`);
+              const addStorefront = (obj: any, path: string, note?: string) => {
+                if (obj?.handle) links.push(`Storefront: https://${domain}/${path}/${obj.handle}${note ? ' ' + note : ''}`);
+              };
+              const addAdmin = (obj: any, path: string) => {
+                if (obj?.id) {
+                  const numId = String(obj.id).split('/').pop();
+                  if (numId) links.push(`Admin: https://admin.shopify.com/store/${adminSlug}/${path}/${numId}`);
+                }
+              };
+              addStorefront(coll, 'collections');
+              addAdmin(coll, 'collections');
+              addStorefront(pg, 'pages');
+              addAdmin(pg, 'pages');
+              addStorefront(art, 'blogs/news', '(blog handle may vary)');
+              addAdmin(art, 'articles');
               return links.length ? <div className="mt-2 text-xs"><strong>Links:</strong> {links.map((l,i)=><div key={i}>{l}</div>)}</div> : null;
             })()}
           </>
