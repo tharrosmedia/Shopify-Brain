@@ -10,7 +10,13 @@ export async function syncProductsForStore(storeId: string) {
     throw new Error('No Shopify credentials for store');
   }
   const client = createAdminClient(store.shopify_domain, store.shopify_access_token);
-  const prods = await fetchProducts(client, {});
+  let prods: any[] = [];
+  try {
+    prods = await fetchProducts(client, { includeMetafields: true });
+  } catch (e) {
+    console.warn('Fetch with metafields failed, retrying without:', e);
+    prods = await fetchProducts(client, { includeMetafields: false });
+  }
   let count = 0;
   for (const p of prods) {
     try {

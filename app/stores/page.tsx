@@ -120,7 +120,7 @@ export default async function StoresPage({ searchParams }: { searchParams: Promi
            <div>
              <label className="block text-sm font-medium mb-1">Shopify Access Token</label>
              <input name="shopify_access_token" placeholder="shpat_..." type="password" className="border p-2 w-full" required />
-             <p className="text-xs text-muted-foreground mt-1">Admin API token (starts with shpat_). Create at Shopify Admin → Settings → Apps and sales channels → Develop apps. Grant read_products + write_collections at minimum.</p>
+              <p className="text-xs text-muted-foreground mt-1">Admin API token (starts with shpat_). Create at Shopify Admin → Settings → Apps and sales channels → Develop apps. Grant read_products + write_collections at minimum. After changing scopes, click "Install app" to generate a NEW access token and paste the updated one here.</p>
            </div>
            <div>
              <label className="block text-sm font-medium mb-1">Config (JSON, optional)</label>

@@ -11,7 +11,7 @@ export async function fetchProducts(adminClient: any, options: { limit?: number;
     const hasQuery = !!query;
     let q = `
       query($first: Int!, $after: String${hasQuery ? ', $query: String' : ''}) {
-        products(first: $first, after: $after${hasQuery ? ', query: $query' : ''}, sortKey: BEST_SELLING) {
+        products(first: $first, after: $after${hasQuery ? ', query: $query' : ''}, sortKey: ID) {
           edges {
             node {
               id

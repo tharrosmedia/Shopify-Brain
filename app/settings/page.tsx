@@ -288,9 +288,10 @@ async function syncProductsAction() {
     });
     revalidatePath('/settings');
     redirect(`/settings?products=synced&count=${result.synced}`);
-  } catch (e) {
+  } catch (e: any) {
     revalidatePath('/settings');
-    redirect('/settings?products=error');
+    const msg = e?.message || 'Failed to sync products';
+    redirect(`/settings?products=error&message=${encodeURIComponent(msg)}`);
   }
 }
 
@@ -363,7 +364,9 @@ export default async function Settings({ searchParams }: { searchParams?: Promis
         <div className="mb-4 p-3 bg-green-100 text-green-700 rounded text-sm">Products synced successfully ({params.count || '0'} imported: titles, descriptions, handles, images, metafields).</div>
       )}
       {params.products === 'error' && (
-        <div className="mb-4 p-3 bg-red-100 text-red-700 rounded text-sm">Error syncing products (check store token with read_products scope).</div>
+        <div className="mb-4 p-3 bg-red-100 text-red-700 rounded text-sm">
+          Error syncing products: {params.message ? decodeURIComponent(params.message) : 'check that the Admin API token has read_products scope (and regenerate the token in Shopify after adding scopes).'}
+        </div>
       )}
 
       <div className="mb-8 border p-4 rounded">
@@ -405,7 +408,7 @@ export default async function Settings({ searchParams }: { searchParams?: Promis
         <form action={syncProductsAction} className="inline">
           <Button type="submit" variant="outline">Sync Products (titles, handles, descriptions, images, metafields)</Button>
         </form>
-        <span className="ml-2 text-xs text-muted-foreground">Imports all products. Run on store add and ~weekly. Enables agent to recommend/include real products in collections/pages.</span>
+        <span className="ml-2 text-xs text-muted-foreground">Imports all products. Run on store add and ~weekly. Enables agent to recommend/include real products in collections/pages. If failing, regenerate the Admin API token in Shopify after confirming scopes.</span>
       </div>
 
       <div className="mb-8 border p-4 rounded">
