@@ -14,6 +14,10 @@ export interface Placement {
     source: string;
     target: MetafieldTarget;
   }>;
+  products?: {
+    mode?: 'manual' | 'rules';
+    auto?: boolean;
+  };
 }
 
 export interface BrandVoice {
@@ -36,6 +40,8 @@ export interface StoreConfig {
     samples?: any;
     lastRefreshed?: string;
   };
+  productsLastSynced?: string;
+  productsSyncedCount?: number;
 }
 
 export interface Store {

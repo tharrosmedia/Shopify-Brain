@@ -4,9 +4,9 @@ import { evaluate } from '../../../lib/agents/core/evaluate';
 export const evaluateFn = inngest.createFunction(
   { id: 'seo-evaluate', retries: 2, triggers: [{ event: 'seo/evaluate' }] },
   async ({ event, step }: any) => {
-    const { draft, type = 'collection', platform, brandVoice, metafieldDefinitions, placement } = event.data;
+    const { draft, type = 'collection', platform, brandVoice, metafieldDefinitions, placement, products } = event.data;
     return await step.run('evaluate', async () => {
-      return evaluate(draft, type, platform, brandVoice, metafieldDefinitions, placement);
+      return evaluate(draft, type, platform, brandVoice, metafieldDefinitions, placement, products);
     });
   }
 );

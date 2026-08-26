@@ -13,8 +13,9 @@ export function buildResearchMessages(args: { keyword: string; type?: string; se
   const bv = brandVoice ? (typeof brandVoice === 'string' ? brandVoice : brandVoice.text || '') : '';
   const bvPart = bv ? ` Follow this brand voice: ${bv}.` : '';
   const knowledgePart = searchData?.knowledge?.length ? ` Use relevant store knowledge: ${searchData.knowledge.join(' | ')}.` : '';
+  const productsPart = searchData?.products?.length ? ` Available products for recommendations/links/collections: ${searchData.products.map((p: any) => `${p.title} (handle: ${p.handle})`).join('; ')}.` : '';
   return [
-    { role: 'system' as const, content: `Summarize key facts, competitors, questions and angles for a ${plat}${type} about: ${keyword}.${bvPart}${knowledgePart} Consider available metafield schema (full store in knowledge, relevant for type) selectively if it helps angles for this keyword (job-first bias).` },
+    { role: 'system' as const, content: `Summarize key facts, competitors, questions and angles for a ${plat}${type} about: ${keyword}.${bvPart}${knowledgePart}${productsPart} Consider available metafield schema (full store in knowledge, relevant for type) selectively if it helps angles for this keyword (job-first bias). Use real product titles/handles when relevant.` },
     { role: 'user' as const, content: `Use this search data: ${dataStr}` }
   ];
 }

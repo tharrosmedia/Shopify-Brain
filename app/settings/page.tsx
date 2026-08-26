@@ -6,6 +6,8 @@ import { inferBrandVoice } from '@/src/lib/agents/brand/voice';
 import { writeKnowledge } from '@/src/lib/brain/memory';
 import { createAdminClient } from '@/src/lib/shopify/client';
 import { fetchStoreSamples, fetchMetafieldDefinitions, fetchMetafieldValueSamples } from '@/src/lib/shopify/content';
+import { syncProductsForStore } from '@/src/lib/shopify/sync';
+import { listProducts } from '@/src/lib/db/products';
 
 async function resyncInngest() {
   'use server';
@@ -201,6 +203,11 @@ async function generatePlacementSuggestion() {
     });
     const hasReason = Object.keys(suggestedByType).some((k) => !existing[k]?.metafields || existing[k].metafields.length < 3);
     const newPlacement = { ...(existing || {}), ...suggestedByType };
+    // Add product config option for collections
+    if (!newPlacement.collection) newPlacement.collection = {};
+    if (!newPlacement.collection.products) {
+      newPlacement.collection.products = { mode: 'rules', auto: true };
+    }
     const suggestedConfig = { placement: newPlacement };
     const json = JSON.stringify(suggestedConfig, null, 2);
     revalidatePath('/settings');
@@ -254,10 +261,43 @@ async function refreshMetafieldSchema() {
   }
 }
 
+async function syncProductsAction() {
+  'use server';
+  const { revalidatePath } = await import('next/cache');
+  const { redirect } = await import('next/navigation');
+  const store = await getActiveStore();
+  if (!store || !store.shopify_access_token) {
+    revalidatePath('/settings');
+    redirect('/settings?products=error');
+    return;
+  }
+  try {
+    const result = await syncProductsForStore(store.id, 50);
+    const currentConfig = store.config || {};
+    const newConfig = {
+      ...currentConfig,
+      productsLastSynced: new Date().toISOString(),
+      productsSyncedCount: result.synced,
+    };
+    await updateStore(store.id, {
+      name: store.name,
+      shopify_domain: store.shopify_domain,
+      shopify_access_token: '',
+      platform: store.platform || 'shopify',
+      config: newConfig,
+    });
+    revalidatePath('/settings');
+    redirect('/settings?products=synced');
+  } catch (e) {
+    revalidatePath('/settings');
+    redirect('/settings?products=error');
+  }
+}
+
 export const dynamic = 'force-dynamic';
 
-export default async function Settings({ searchParams }: { searchParams?: Promise<{ resync?: string; brand?: string; autonomy?: string; knowledge?: string; url?: string; status?: string; message?: string; placement?: string; placementReason?: string; metafields?: string }> }) {
-  const params = await (searchParams || Promise.resolve({})) as { resync?: string; brand?: string; autonomy?: string; knowledge?: string; url?: string; status?: string; message?: string; placement?: string; placementReason?: string; metafields?: string };
+export default async function Settings({ searchParams }: { searchParams?: Promise<{ resync?: string; brand?: string; autonomy?: string; knowledge?: string; url?: string; status?: string; message?: string; placement?: string; placementReason?: string; metafields?: string; products?: string }> }) {
+  const params = await (searchParams || Promise.resolve({})) as { resync?: string; brand?: string; autonomy?: string; knowledge?: string; url?: string; status?: string; message?: string; placement?: string; placementReason?: string; metafields?: string; products?: string };
   const store = await getActiveStore();
   const config = store?.config || {};
   const bv = config.brandVoice || null;
@@ -319,6 +359,12 @@ export default async function Settings({ searchParams }: { searchParams?: Promis
       {params.metafields === 'error' && (
         <div className="mb-4 p-3 bg-red-100 text-red-700 rounded text-sm">Error refreshing metafield schema (check store token/permissions).</div>
       )}
+      {params.products === 'synced' && (
+        <div className="mb-4 p-3 bg-green-100 text-green-700 rounded text-sm">Products synced successfully (titles, descriptions, handles, images, metafields).</div>
+      )}
+      {params.products === 'error' && (
+        <div className="mb-4 p-3 bg-red-100 text-red-700 rounded text-sm">Error syncing products (check store token with read_products scope).</div>
+      )}
 
       <div className="mb-8 border p-4 rounded">
         <h2 className="font-semibold mb-4">Inngest Sync</h2>
@@ -336,6 +382,7 @@ export default async function Settings({ searchParams }: { searchParams?: Promis
             <div>Store: {store.name} ({store.shopify_domain})</div>
             <div>Placement: {config.placement ? 'Configured' : 'Using defaults'}</div>
             <div>Metafields: {config.metafieldSchema?.lastRefreshed ? `Refreshed ${new Date(config.metafieldSchema.lastRefreshed).toLocaleDateString()} (${config.metafieldSchema.definitions?.length || 0} fields)` : 'Not loaded (use Refresh button)'}</div>
+            <div>Products: {config.productsLastSynced ? `Synced ${new Date(config.productsLastSynced).toLocaleDateString()} (${config.productsSyncedCount || 0} products)` : 'Not synced (use button below)'}</div>
             <div>Brand Voice: {bv ? 'Set' : 'Not set'}{bv && bv.inferredAt ? ` (inferred ${new Date(bv.inferredAt).toLocaleDateString()})` : ''}</div>
             <div>Autonomy: {auto ? 'Set' : 'Defaults (all types, require approval)'}</div>
           </div>
@@ -351,6 +398,14 @@ export default async function Settings({ searchParams }: { searchParams?: Promis
           <Button type="submit" variant="outline">Refresh full schema + values (Brand + store mind)</Button>
         </form>
         <span className="ml-2 text-xs text-muted-foreground">Agent uses relevant fields per job type but has full store schema/values in knowledge/config. Creates new if needed.</span>
+      </div>
+
+      <div className="mb-8 border p-4 rounded">
+        <h2 className="font-semibold mb-4">Products Sync (for agent context)</h2>
+        <form action={syncProductsAction} className="inline">
+          <Button type="submit" variant="outline">Sync Products (titles, handles, descriptions, images, metafields)</Button>
+        </form>
+        <span className="ml-2 text-xs text-muted-foreground">Capped at ~50. Run on store add and ~weekly. Enables agent to recommend/include real products in collections/pages.</span>
       </div>
 
       <div className="mb-8 border p-4 rounded">

@@ -3,7 +3,7 @@ import { xai, XAI_MODEL } from '../../ai/xai';
 import { buildResearchMessages } from '../../prompts/seo/research';
 import { retrieve, writeKnowledge } from '../../brain/memory';
 
-export async function research({ storeId, keyword, type = 'collection', platform, brandVoice, metafieldDefinitions, placement }: { storeId: string; keyword: string; type?: string; platform?: string; brandVoice?: any; metafieldDefinitions?: any[]; placement?: any }) {
+export async function research({ storeId, keyword, type = 'collection', platform, brandVoice, metafieldDefinitions, placement, products = [] }: { storeId: string; keyword: string; type?: string; platform?: string; brandVoice?: any; metafieldDefinitions?: any[]; placement?: any; products?: any[] }) {
   const tavilyRes = await fetch('https://api.tavily.com/search', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -17,8 +17,9 @@ export async function research({ storeId, keyword, type = 'collection', platform
   const data = await tavilyRes.json();
   const keywordKnowledge = await retrieve(storeId, keyword, 3);
   const schemaKnowledge = await retrieve(storeId, 'metafield schema definitions', 2);
-  const knowledge = [...keywordKnowledge, ...schemaKnowledge];
-  const searchDataWithKnowledge = { ...data, knowledge };
+  const productKnowledge = products && products.length ? [`Relevant products: ${products.map((p: any) => `${p.title} (/${p.handle})`).join(', ')}`] : [];
+  const knowledge = [...keywordKnowledge, ...schemaKnowledge, ...productKnowledge];
+  const searchDataWithKnowledge = { ...data, knowledge, products };
   const allMsgs = buildResearchMessages({ keyword, type, searchData: searchDataWithKnowledge, brandVoice, platform });
   const sys = allMsgs.find(m => m.role === 'system')?.content;
   const userMsgs = allMsgs.filter(m => m.role !== 'system');

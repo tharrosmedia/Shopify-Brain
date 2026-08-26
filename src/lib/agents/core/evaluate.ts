@@ -9,15 +9,16 @@ const EvalSchema = z.object({
   suggestions: z.array(z.string()).optional(),
 });
 
-export async function evaluate(draft: any, type = 'collection', platform?: string, brandVoice?: any, metafieldDefinitions?: any[], placement?: any) {
+export async function evaluate(draft: any, type = 'collection', platform?: string, brandVoice?: any, metafieldDefinitions?: any[], placement?: any, products: any[] = []) {
   const content = (draft.bodyHtml || '').slice(0, 2000);
   const bv = brandVoice ? (typeof brandVoice === 'string' ? brandVoice : brandVoice.text || '') : '';
   const mfInfo = draft.metafields ? `metafields used: ${Object.keys(draft.metafields).length}` : 'no metafields';
+  const prodInfo = products.length ? `products context: ${products.slice(0,3).map((p:any)=>p.title).join(', ')}` : '';
   try {
     const { object } = await generateObject({
       model: xai(XAI_MODEL),
       schema: EvalSchema,
-      prompt: `Evaluate this ${type} draft for quality, SEO, brand voice match (${bv}). Content: ${content}. ${mfInfo}. Return length, hasFaq, score 0-1, optional suggestions (mention metafield relevance if applicable, job-first).`,
+      prompt: `Evaluate this ${type} draft for quality, SEO, brand voice match (${bv}). Content: ${content}. ${mfInfo}. ${prodInfo}. Return length, hasFaq, score 0-1, optional suggestions (mention metafield relevance if applicable, job-first).`,
     });
     return { ...object, type, brandVoice, platform };
   } catch {

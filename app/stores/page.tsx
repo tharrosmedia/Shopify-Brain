@@ -54,6 +54,11 @@ async function addStore(formData: FormData) {
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
   });
+  // Initial product sync on store add (capped)
+  try {
+    const { syncProductsForStore } = await import('@/src/lib/shopify/sync');
+    await syncProductsForStore(newStore.id, 20);
+  } catch {}
   revalidatePath('/stores');
   redirect('/stores?add=success');
 }

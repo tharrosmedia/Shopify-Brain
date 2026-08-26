@@ -1,5 +1,5 @@
 import { createAdminClient } from '../../shopify/client';
-import { createAndPublishCollection } from '../../shopify/collections';
+import { createAndPublishCollection, addProductsToCollection, setCollectionRules } from '../../shopify/collections';
 import { createAndPublishPage } from '../../shopify/pages';
 import { createAndPublishArticle } from '../../shopify/blogs';
 import { getStore } from '../../db/stores';
@@ -23,7 +23,7 @@ function getResourceId(response: any, type: string): string | null {
   return response?.data?.collectionCreate?.collection?.id || null;
 }
 
-export async function publishContent({ storeId, draft, type = 'collection', platform, brandVoice }: { storeId: string; draft: any; type?: string; platform?: string; brandVoice?: any }) {
+export async function publishContent({ storeId, draft, type = 'collection', platform, brandVoice, products = [] }: { storeId: string; draft: any; type?: string; platform?: string; brandVoice?: any; products?: any[] }) {
   const store = await getStore(storeId);
   if (!store || !store.shopify_access_token) {
     throw new Error(`No Shopify credentials configured for store ${storeId}`);
@@ -118,6 +118,28 @@ export async function publishContent({ storeId, draft, type = 'collection', plat
   const ownerId = getResourceId(response, type);
   if (ownerId && mfs.length > 0) {
     await setMetafields(client, ownerId, mfs);
+  }
+
+  // Handle products for collections (configurable via placement.collection.products)
+  if (type === 'collection' && ownerId && products.length > 0) {
+    const collPlacement = placement?.collection || placement?.default || {};
+    const prodCfg = collPlacement.products || {};
+    const mode = prodCfg.mode || 'rules'; // 'rules' | 'manual'
+    const auto = prodCfg.auto !== false; // default true
+    if (auto) {
+      try {
+        const prodIds = products.slice(0, 10).map((p: any) => p.shopifyId).filter(Boolean);
+        if (mode === 'manual' && prodIds.length) {
+          await addProductsToCollection(client, ownerId, prodIds);
+        } else if (mode === 'rules') {
+          // simple rule based on keyword from draft or first products
+          const handles = products.slice(0, 5).map((p: any) => p.handle).filter(Boolean);
+          await setCollectionRules(client, ownerId, handles);
+        }
+      } catch (e) {
+        console.warn('[PUBLISH] product add to collection failed', e);
+      }
+    }
   }
   return response;
 }

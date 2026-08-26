@@ -17,6 +17,7 @@ import { getStore } from '../../../lib/db/stores';
 import { createAdminClient } from '../../../lib/shopify/client';
 import { fetchMetafieldDefinitions, fetchMetafieldValueSamples } from '../../../lib/shopify/content';
 import { writeKnowledge } from '../../../lib/brain/memory';
+import { listProducts, searchProducts } from '../../../lib/db/products';
 
 export const seoJob = inngest.createFunction(
   { id: 'seo-job', retries: 2, triggers: [{ event: 'seo/job.requested' }] },
@@ -83,6 +84,7 @@ export const seoJob = inngest.createFunction(
     // But always ensure FULL schema + values are in knowledge for store-wide awareness.
     let placement: any = {};
     let metafieldDefinitions: any[] = []; // relevant slice for this job
+    let products: any[] = [];
     try {
       const store = await getStore(storeId);
       if (store?.config?.placement) {
@@ -114,6 +116,23 @@ export const seoJob = inngest.createFunction(
           });
         }
       }
+
+      // Load products from DB for agent context (recommend/include in collections etc.)
+      if (type === 'collection') {
+        try {
+          const byKeyword = await searchProducts(storeId, keyword, 10);
+          const top = await listProducts(storeId, 20);
+          // dedup by handle
+          const seen = new Set();
+          products = [...byKeyword, ...top].filter(p => {
+            if (seen.has(p.handle)) return false;
+            seen.add(p.handle);
+            return true;
+          }).slice(0, 20);
+        } catch {}
+      } else {
+        products = await listProducts(storeId, 10);
+      }
     } catch (e) {
       console.warn('[SEO] failed to load placement/defs for agents', e);
     }
@@ -122,7 +141,7 @@ export const seoJob = inngest.createFunction(
       try {
         researchResult = await step.invoke('research', {
           function: researchFn,
-          data: { storeId, keyword, type, platform, brandVoice, metafieldDefinitions, placement },
+          data: { storeId, keyword, type, platform, brandVoice, metafieldDefinitions, placement, products },
         });
       } catch (err: any) {
         await step.invoke('log-research-fail', {
@@ -135,7 +154,7 @@ export const seoJob = inngest.createFunction(
       try {
         brief = await step.invoke('create-brief', {
           function: createBriefFn,
-          data: { storeId, keyword, research: researchResult, type, platform, brandVoice, metafieldDefinitions, placement },
+          data: { storeId, keyword, research: researchResult, type, platform, brandVoice, metafieldDefinitions, placement, products },
         });
       } catch (err: any) {
         await step.invoke('log-brief-fail', {
@@ -148,7 +167,7 @@ export const seoJob = inngest.createFunction(
       try {
         draft = await step.invoke('write', {
           function: writeDraftFn,
-          data: { storeId, brief, type, platform, brandVoice, metafieldDefinitions, placement },
+          data: { storeId, brief, type, platform, brandVoice, metafieldDefinitions, placement, products },
         });
       } catch (err: any) {
         await step.invoke('log-write-fail', {
@@ -160,17 +179,17 @@ export const seoJob = inngest.createFunction(
 
       edited = await step.invoke('edit', {
         function: editDraftFn,
-        data: { storeId, draft, type, platform, brandVoice, metafieldDefinitions, placement },
+        data: { storeId, draft, type, platform, brandVoice, metafieldDefinitions, placement, products },
       });
 
       optimized = await step.invoke('optimize', {
         function: optimizeDraftFn,
-        data: { storeId, draft: edited, type, platform, brandVoice, metafieldDefinitions, placement },
+        data: { storeId, draft: edited, type, platform, brandVoice, metafieldDefinitions, placement, products },
       });
 
       scores = await step.invoke('evaluate', {
         function: evaluateFn,
-        data: { draft: optimized, type, platform, brandVoice, metafieldDefinitions, placement },
+        data: { draft: optimized, type, platform, brandVoice, metafieldDefinitions, placement, products },
       });
 
       draftRecord = await step.invoke('save-draft', {
@@ -305,7 +324,7 @@ export const seoJob = inngest.createFunction(
 
       const result = await step.invoke('publish', {
         function: publishFn,
-        data: { storeId, draft: finalDraft, type, platform, brandVoice },
+        data: { storeId, draft: finalDraft, type, platform, brandVoice, products },
       });
 
       await step.invoke('update-job-completed', {
