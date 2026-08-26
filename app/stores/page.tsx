@@ -14,6 +14,7 @@ async function testConnection(formData: FormData) {
   if (!store || !store.shopify_access_token) {
     redirect(`/stores?test=error&msg=${encodeURIComponent('No credentials')}`);
   }
+  let shop: any;
   try {
     const client = createAdminClient(store.shopify_domain, store.shopify_access_token);
     const query = `{
@@ -23,14 +24,17 @@ async function testConnection(formData: FormData) {
       }
     }`;
     const response: any = await client.request(query);
-    const shop = response?.shop || response?.data?.shop || response;
+    shop = response?.shop || response?.data?.shop || response;
     if (!shop || !shop.name) {
       throw new Error(`Unexpected Shopify response shape (check token/scopes/domain): ${JSON.stringify(response)}`);
     }
-    redirect(`/stores?test=success&msg=${encodeURIComponent(`Connected to ${shop.name} (${shop.id})`)}`);
   } catch (e: any) {
+    if (e?.digest?.startsWith('NEXT_REDIRECT')) {
+      throw e;
+    }
     redirect(`/stores?test=error&msg=${encodeURIComponent(e.message || 'Connection failed')}`);
   }
+  redirect(`/stores?test=success&msg=${encodeURIComponent(`Connected to ${shop.name} (${shop.id})`)}`);
 }
 
 async function addStore(formData: FormData) {
