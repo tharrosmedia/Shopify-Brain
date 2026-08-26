@@ -1,13 +1,13 @@
 import { createAdminClient } from './client';
 
 export async function fetchProducts(adminClient: any, options: { limit?: number; query?: string; includeMetafields?: boolean } = {}) {
-  const { limit = 50, query, includeMetafields = true } = options;
+  const { limit, query, includeMetafields = true } = options;
   const products: any[] = [];
   let hasNextPage = true;
   let cursor: string | null = null;
 
-  while (hasNextPage && products.length < limit) {
-    const first = Math.min(50, limit - products.length);
+  while (hasNextPage && (!limit || limit <= 0 || products.length < limit)) {
+    const first = Math.min(50, (limit && limit > 0) ? limit - products.length : 50);
     let q = `
       query($first: Int!, $after: String, $query: String) {
         products(first: $first, after: $after, query: $query, sortKey: BEST_SELLING) {
@@ -73,11 +73,11 @@ export async function fetchProducts(adminClient: any, options: { limit?: number;
         tags: n.tags || [],
         metafields,
       });
-      if (products.length >= limit) break;
+      if (limit && limit > 0 && products.length >= limit) break;
     }
 
     const pageInfo = res?.data?.products?.pageInfo;
-    hasNextPage = pageInfo?.hasNextPage && products.length < limit;
+    hasNextPage = pageInfo?.hasNextPage && (!limit || limit <= 0 || products.length < limit);
     cursor = pageInfo?.endCursor || null;
   }
 

@@ -272,7 +272,7 @@ async function syncProductsAction() {
     return;
   }
   try {
-    const result = await syncProductsForStore(store.id, 50);
+    const result = await syncProductsForStore(store.id);
     const currentConfig = store.config || {};
     const newConfig = {
       ...currentConfig,
@@ -405,7 +405,7 @@ export default async function Settings({ searchParams }: { searchParams?: Promis
         <form action={syncProductsAction} className="inline">
           <Button type="submit" variant="outline">Sync Products (titles, handles, descriptions, images, metafields)</Button>
         </form>
-        <span className="ml-2 text-xs text-muted-foreground">Capped at ~50. Run on store add and ~weekly. Enables agent to recommend/include real products in collections/pages.</span>
+        <span className="ml-2 text-xs text-muted-foreground">Imports all products. Run on store add and ~weekly. Enables agent to recommend/include real products in collections/pages.</span>
       </div>
 
       <div className="mb-8 border p-4 rounded">

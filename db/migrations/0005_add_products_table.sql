@@ -13,7 +13,19 @@ CREATE TABLE IF NOT EXISTS products (
   updated_at timestamptz DEFAULT now()
 );
 
-ALTER TABLE products ADD CONSTRAINT IF NOT EXISTS unique_store_shopify_id UNIQUE (store_id, shopify_id);
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conname = 'unique_store_shopify_id'
+      AND conrelid = 'products'::regclass
+  ) THEN
+    ALTER TABLE products
+    ADD CONSTRAINT unique_store_shopify_id
+    UNIQUE (store_id, shopify_id);
+  END IF;
+END $$;
 
 CREATE INDEX IF NOT EXISTS idx_products_store ON products(store_id);
 CREATE INDEX IF NOT EXISTS idx_products_handle ON products(store_id, handle);

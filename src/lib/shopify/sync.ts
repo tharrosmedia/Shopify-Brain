@@ -4,13 +4,13 @@ import { fetchProducts } from './products';
 import { upsertProduct } from '../db/products';
 import { writeKnowledge } from '../brain/memory';
 
-export async function syncProductsForStore(storeId: string, limit = 50) {
+export async function syncProductsForStore(storeId: string) {
   const store = await getStore(storeId);
   if (!store || !store.shopify_access_token) {
     throw new Error('No Shopify credentials for store');
   }
   const client = createAdminClient(store.shopify_domain, store.shopify_access_token);
-  const prods = await fetchProducts(client, { limit });
+  const prods = await fetchProducts(client, {});
   let count = 0;
   for (const p of prods) {
     try {
