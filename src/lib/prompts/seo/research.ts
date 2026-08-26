@@ -1,4 +1,4 @@
-export const RESEARCH_SYSTEM_PROMPT = 'Summarize key facts, competitors, questions and angles for content.';
+export const RESEARCH_SYSTEM_PROMPT = 'Summarize key facts, competitors, questions and angles for content. Use metafield schema selectively if helpful for the keyword.';
 
 export function buildResearchUserPrompt({ keyword, type = 'collection', searchData, brandVoice, platform }: { keyword: string; type?: string; searchData: any; brandVoice?: any; platform?: string }) {
   const dataStr = JSON.stringify(searchData).slice(0, 2000);
@@ -14,7 +14,7 @@ export function buildResearchMessages(args: { keyword: string; type?: string; se
   const bvPart = bv ? ` Follow this brand voice: ${bv}.` : '';
   const knowledgePart = searchData?.knowledge?.length ? ` Use relevant store knowledge: ${searchData.knowledge.join(' | ')}.` : '';
   return [
-    { role: 'system' as const, content: `Summarize key facts, competitors, questions and angles for a ${plat}${type} about: ${keyword}.${bvPart}${knowledgePart}` },
+    { role: 'system' as const, content: `Summarize key facts, competitors, questions and angles for a ${plat}${type} about: ${keyword}.${bvPart}${knowledgePart} Consider available metafield schema selectively if it helps angles for this keyword (job-first bias).` },
     { role: 'user' as const, content: `Use this search data: ${dataStr}` }
   ];
 }

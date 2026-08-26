@@ -61,6 +61,18 @@ npm run dev
 npx inngest-cli@latest dev -u http://localhost:3000/api/inngest
 ```
 
+## Production (Railway + custom domain)
+- Set env vars on your host (no auto-detection):
+  - `PUBLIC_URL=https://cerevex.store` (base only)
+  - `INNGEST_EVENT_KEY`, `INNGEST_SIGNING_KEY`
+  - `INNGEST_API_KEY` (management key for resync)
+  - Optionally `INNGEST_APP_ID` (if not `shopify-brain`)
+- Redeploy/restart after changing vars.
+- Use `/settings` → "Resync Inngest" button (temporary; will be removed).
+- Or run: `npm run inngest:sync` (with env loaded).
+- Handler lives at `https://<your-domain>/api/inngest`.
+- Resync posts to Inngest using the resolved URL.
+
 ## Usage
 1. Visit http://localhost:3000 (login with APP_PASSWORD)
 2. Use Dashboard to trigger SEO jobs by keyword.

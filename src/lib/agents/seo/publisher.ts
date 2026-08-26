@@ -11,7 +11,7 @@ function getSourceValue(draft: any, source: string): any {
   if (source === 'metaDescription') return draft.metaDescription;
   if (source === 'schemaJsonLd') return draft.schemaJsonLd;
   if (source.startsWith('metafields.')) {
-    const key = source.split('.')[1];
+    const key = source.replace(/^metafields\./, '');
     return draft.metafields?.[key];
   }
   return draft[source];
@@ -63,6 +63,25 @@ export async function publishContent({ storeId, draft, type = 'collection', plat
       }
     }
   }
+
+  // Auto-set any metafields the agent produced (supports agent-created keys + "namespace.key"; best for agent)
+  for (const [fullKey, val] of Object.entries(draft.metafields || {})) {
+    if (val == null) continue;
+    let ns = 'custom';
+    let k = fullKey;
+    if (fullKey.includes('.')) {
+      const parts = fullKey.split('.');
+      ns = parts[0];
+      k = parts.slice(1).join('.');
+    }
+    const already = mfs.some((m: any) => m.namespace === ns && m.key === k);
+    if (!already) {
+      const v = typeof val === 'object' ? JSON.stringify(val) : String(val);
+      const t = v.includes('<') || v.includes('</') ? 'multi_line_text_field' : 'single_line_text_field';
+      mfs.push({ namespace: ns, key: k, value: v, type: t });
+    }
+  }
+
   const mainInput: any = {
     title: draft.title,
     handle: draft.handle,

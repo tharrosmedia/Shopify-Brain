@@ -8,14 +8,15 @@ const OptimizeSchema = z.object({
   schemaJsonLd: z.any(),
 });
 
-export async function optimizeDraft({ storeId, draft, type = 'collection', platform, brandVoice }: { storeId: string; draft: any; type?: string; platform?: string; brandVoice?: any }) {
+export async function optimizeDraft({ storeId, draft, type = 'collection', platform, brandVoice, metafieldDefinitions, placement }: { storeId: string; draft: any; type?: string; platform?: string; brandVoice?: any; metafieldDefinitions?: any[]; placement?: any }) {
   const bv = brandVoice ? (typeof brandVoice === 'string' ? brandVoice : brandVoice.text || '') : '';
   const base = draft.title || draft.keyword || '';
+  const defsStr = (metafieldDefinitions && metafieldDefinitions.length) ? 'defs available' : 'no defs';
   try {
     const { object } = await generateObject({
       model: xai(XAI_MODEL),
       schema: OptimizeSchema,
-      prompt: `Optimize meta and schema for a ${type} about "${base}". Brand voice: ${bv}. Platform: ${platform}. Current title: ${base}. Provide improved metaTitle, metaDescription, and schemaJsonLd object with @type appropriate for ${type}.`,
+      prompt: `Optimize meta and schema for a ${type} about "${base}". Brand voice: ${bv}. Platform: ${platform}. Current title: ${base}. Selectively refine any chosen metafields if they help SEO (job-first). Defs: ${defsStr}. Provide improved metaTitle, metaDescription, and schemaJsonLd object with @type appropriate for ${type}.`,
     });
     return { ...draft, ...object, brandVoice, type, platform };
   } catch {

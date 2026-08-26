@@ -3,7 +3,7 @@ import { xai, XAI_MODEL } from '../../ai/xai';
 import { buildResearchMessages } from '../../prompts/seo/research';
 import { retrieve, writeKnowledge } from '../../brain/memory';
 
-export async function research({ storeId, keyword, type = 'collection', platform, brandVoice }: { storeId: string; keyword: string; type?: string; platform?: string; brandVoice?: any }) {
+export async function research({ storeId, keyword, type = 'collection', platform, brandVoice, metafieldDefinitions, placement }: { storeId: string; keyword: string; type?: string; platform?: string; brandVoice?: any; metafieldDefinitions?: any[]; placement?: any }) {
   const tavilyRes = await fetch('https://api.tavily.com/search', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -15,7 +15,9 @@ export async function research({ storeId, keyword, type = 'collection', platform
     }),
   });
   const data = await tavilyRes.json();
-  const knowledge = await retrieve(storeId, keyword, 3);
+  const keywordKnowledge = await retrieve(storeId, keyword, 3);
+  const schemaKnowledge = await retrieve(storeId, 'metafield schema definitions', 2);
+  const knowledge = [...keywordKnowledge, ...schemaKnowledge];
   const searchDataWithKnowledge = { ...data, knowledge };
   const allMsgs = buildResearchMessages({ keyword, type, searchData: searchDataWithKnowledge, brandVoice, platform });
   const sys = allMsgs.find(m => m.role === 'system')?.content;

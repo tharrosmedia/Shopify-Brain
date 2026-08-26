@@ -14,6 +14,9 @@ import { publishFn } from './publish';
 import { updateJobStatus } from '../../../lib/db/jobs';
 import { logEvent } from '../../../lib/brain/events';
 import { getStore } from '../../../lib/db/stores';
+import { createAdminClient } from '../../../lib/shopify/client';
+import { fetchMetafieldDefinitions } from '../../../lib/shopify/content';
+import { writeKnowledge } from '../../../lib/brain/memory';
 
 export const seoJob = inngest.createFunction(
   { id: 'seo-job', retries: 2, triggers: [{ event: 'seo/job.requested' }] },
@@ -76,11 +79,37 @@ export const seoJob = inngest.createFunction(
 
     let researchResult: any, brief: any, draft: any, edited: any, optimized: any, scores: any, draftRecord: any;
 
+    // Load placement + live metafield defs early so agents can be aware (job-first bias)
+    let placement: any = {};
+    let metafieldDefinitions: any[] = [];
+    try {
+      const store = await getStore(storeId);
+      if (store?.config?.placement) {
+        placement = store.config.placement || {};
+      }
+      if (store && store.shopify_access_token) {
+        const client = createAdminClient(store.shopify_domain, store.shopify_access_token);
+        const allDefs = await fetchMetafieldDefinitions(client);
+        const ownerType = type === 'collection' ? 'COLLECTION' : type === 'page' ? 'PAGE' : type === 'blog' ? 'ARTICLE' : 'COLLECTION';
+        metafieldDefinitions = allDefs.filter((d: any) => d.ownerType === ownerType);
+        if (metafieldDefinitions.length > 0) {
+          const schemaSummary = metafieldDefinitions.map((d: any) => ({
+            name: d.name, namespace: d.namespace, key: d.key, type: d.type?.name, description: d.description
+          }));
+          await writeKnowledge(storeId, `Available metafield definitions for ${type}s (use selectively where they help SEO for the keyword): ${JSON.stringify(schemaSummary)}`, {
+            type: 'metafield_schema', ownerType, source: 'job'
+          });
+        }
+      }
+    } catch (e) {
+      console.warn('[SEO] failed to load placement/defs for agents', e);
+    }
+
     try {
       try {
         researchResult = await step.invoke('research', {
           function: researchFn,
-          data: { storeId, keyword, type, platform, brandVoice },
+          data: { storeId, keyword, type, platform, brandVoice, metafieldDefinitions, placement },
         });
       } catch (err: any) {
         await step.invoke('log-research-fail', {
@@ -93,7 +122,7 @@ export const seoJob = inngest.createFunction(
       try {
         brief = await step.invoke('create-brief', {
           function: createBriefFn,
-          data: { storeId, keyword, research: researchResult, type, platform, brandVoice },
+          data: { storeId, keyword, research: researchResult, type, platform, brandVoice, metafieldDefinitions, placement },
         });
       } catch (err: any) {
         await step.invoke('log-brief-fail', {
@@ -106,7 +135,7 @@ export const seoJob = inngest.createFunction(
       try {
         draft = await step.invoke('write', {
           function: writeDraftFn,
-          data: { storeId, brief, type, platform, brandVoice },
+          data: { storeId, brief, type, platform, brandVoice, metafieldDefinitions, placement },
         });
       } catch (err: any) {
         await step.invoke('log-write-fail', {
@@ -118,17 +147,17 @@ export const seoJob = inngest.createFunction(
 
       edited = await step.invoke('edit', {
         function: editDraftFn,
-        data: { storeId, draft, type, platform, brandVoice },
+        data: { storeId, draft, type, platform, brandVoice, metafieldDefinitions, placement },
       });
 
       optimized = await step.invoke('optimize', {
         function: optimizeDraftFn,
-        data: { storeId, draft: edited, type, platform, brandVoice },
+        data: { storeId, draft: edited, type, platform, brandVoice, metafieldDefinitions, placement },
       });
 
       scores = await step.invoke('evaluate', {
         function: evaluateFn,
-        data: { draft: optimized, type, platform, brandVoice },
+        data: { draft: optimized, type, platform, brandVoice, metafieldDefinitions, placement },
       });
 
       draftRecord = await step.invoke('save-draft', {
@@ -306,6 +335,7 @@ function createBasicDraft(type: string, keyword: string, platform = 'shopify', b
     bodyHtml: `<h1>${keyword}</h1><p>Content for ${plat}${type} about ${keyword}. (Fallback generation — please review and edit.)</p>`,
     metaTitle: keyword,
     metaDescription: `Learn about ${keyword} in this ${type}.`,
+    metafields: {},
     type,
     brandVoice,
   };
