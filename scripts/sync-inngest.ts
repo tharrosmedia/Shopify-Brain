@@ -2,7 +2,7 @@ import 'dotenv/config';
 
 const apiKey = process.env.INNGEST_API_KEY;
 const appId = 'shopify-brain';
-const handlerUrl = process.env.PUBLIC_URL || 'https://cerevex.store/api/inngest';
+const handlerUrl = process.env.PUBLIC_URL || 'https://your-domain.example/api/inngest';
 
 if (!apiKey) {
   console.error('INNGEST_API_KEY is required (create a management key in Inngest dashboard)');

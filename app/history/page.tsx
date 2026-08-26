@@ -77,7 +77,7 @@ export default async function History() {
                       if (coll?.id) { const n = String(coll.id).split('/').pop(); if (n) links.push(`Admin: /collections/${n}`); }
                       if (pg?.handle) links.push(`SF: /pages/${pg.handle}`);
                       if (pg?.id) { const n = String(pg.id).split('/').pop(); if (n) links.push(`Admin: /pages/${n}`); }
-                      if (art?.handle) links.push(`SF: /blogs/news/${art.handle}`);
+                      if (art?.handle) links.push(`SF: /blogs/blog/${art.handle}`);
                       if (art?.id) { const n = String(art.id).split('/').pop(); if (n) links.push(`Admin: /articles/${n}`); }
                       return links.length ? <div className="text-[10px] mt-0.5 text-blue-600">{links.join(' | ')}</div> : null;
                     })()}

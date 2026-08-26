@@ -18,7 +18,7 @@ export async function getFirstBlog(adminClient: any): Promise<{ id: string; hand
   if (!blog?.id) {
     throw new Error('No blogs found in this Shopify store. Create at least one blog to publish blog posts.');
   }
-  return { id: blog.id, handle: blog.handle || 'news' };
+  return { id: blog.id, handle: blog.handle || 'blog' };
 }
 
 export async function getFirstBlogId(adminClient: any): Promise<string> {

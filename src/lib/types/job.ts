@@ -1,6 +1,7 @@
 export type JobDomain = 'seo' | 'ads' | 'fulfillment' | 'customer-service' | 'inventory';
 export type JobStatus =
   | 'pending'
+  | 'queued'
   | 'running'
   | 'awaiting_approval'
   | 'approved'

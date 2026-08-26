@@ -44,7 +44,7 @@ export async function updateStore(id: string, { name, shopify_domain, shopify_ac
 
 export async function getActiveStoreId(): Promise<string | null> {
   const cookieStore = await cookies();
-  let storeId = cookieStore.get('activeStoreId')?.value || process.env.DEV_STORE_ID || null;
+  let storeId = cookieStore.get('activeStoreId')?.value || null;
   const stores = await listStores();
   if (!storeId || storeId === 'undefined' || !stores.some((s: any) => s.id === storeId)) {
     if (stores.length === 0) return null;

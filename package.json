@@ -13,7 +13,9 @@
     "trigger:seo": "tsx scripts/trigger-seo.ts",
     "test:shopify": "tsx scripts/test-shopify.ts",
     "inngest:sync": "tsx scripts/sync-inngest.ts",
-    "test:prompt": "tsx scripts/test-prompt.ts"
+    "test:prompt": "tsx scripts/test-prompt.ts",
+    "test": "tsx tests/basic-agents.test.ts",
+    "ingest:knowledge": "tsx scripts/ingest-knowledge.ts"
   },
   "keywords": [],
   "author": "",

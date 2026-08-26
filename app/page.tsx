@@ -83,7 +83,7 @@ export default async function Dashboard() {
 
   return (
     <div className="p-8 max-w-6xl mx-auto">
-      <h1 className="text-3xl font-bold mb-8">Shopify Brain - cerevex.store</h1>
+      <h1 className="text-3xl font-bold mb-8">Shopify Brain</h1>
       <AutoRefresh interval={4000} />
 
       {allStores.length === 0 && (

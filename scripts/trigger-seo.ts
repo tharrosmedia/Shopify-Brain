@@ -1,9 +1,11 @@
 import 'dotenv/config';
 import { inngest } from '../src/inngest/client.js';
 
-const storeId = process.env.DEV_STORE_ID as string;
+const args = process.argv.slice(2);
+const storeArgIdx = args.indexOf('--store');
+const storeId = (storeArgIdx !== -1 ? args[storeArgIdx + 1] : process.env.DEV_STORE_ID) as string;
 if (!storeId) {
-  console.error('DEV_STORE_ID or explicit storeId required for script');
+  console.error('Usage: tsx scripts/trigger-seo.ts [--store <storeId>] (or set DEV_STORE_ID)');
   process.exit(1);
 }
 await inngest.send({

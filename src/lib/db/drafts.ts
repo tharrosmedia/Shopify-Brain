@@ -40,5 +40,7 @@ export async function updateDraft(draftId: string, updates: Partial<{ title: str
   if (updates.schemaJsonLd) { sets.push('schema_jsonld = $' + (values.length + 1)); values.push(updates.schemaJsonLd); }
   if (sets.length === 0) return;
   const setClause = sets.join(', ');
-  await sql`UPDATE drafts SET ${setClause} WHERE id = ${draftId}`;
+  const q = `UPDATE drafts SET ${setClause} WHERE id = $${values.length + 1}`;
+  values.push(draftId);
+  await sql.query(q, values);
 }

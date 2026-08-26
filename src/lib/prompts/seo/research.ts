@@ -12,8 +12,9 @@ export function buildResearchMessages(args: { keyword: string; type?: string; se
   const plat = platform ? `${platform} ` : '';
   const bv = brandVoice ? (typeof brandVoice === 'string' ? brandVoice : brandVoice.text || '') : '';
   const bvPart = bv ? ` Follow this brand voice: ${bv}.` : '';
+  const knowledgePart = searchData?.knowledge?.length ? ` Use relevant store knowledge: ${searchData.knowledge.join(' | ')}.` : '';
   return [
-    { role: 'system' as const, content: `Summarize key facts, competitors, questions and angles for a ${plat}${type} about: ${keyword}.${bvPart}` },
+    { role: 'system' as const, content: `Summarize key facts, competitors, questions and angles for a ${plat}${type} about: ${keyword}.${bvPart}${knowledgePart}` },
     { role: 'user' as const, content: `Use this search data: ${dataStr}` }
   ];
 }

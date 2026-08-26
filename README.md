@@ -61,7 +61,7 @@ npm run dev
 npx inngest-cli@latest dev -u http://localhost:3000/api/inngest
 ```
 
-## Usage (UI on cerevex.store)
+## Usage
 1. Visit http://localhost:3000 (login with APP_PASSWORD)
 2. Use Dashboard to trigger SEO jobs by keyword.
 3. Go to Review Queue to view/approve/edit drafts.
@@ -91,6 +91,11 @@ Full details (Stage A exit criteria, data model, agent steps, Inngest skeleton, 
 - Requeue consistency (brandVoice/platform)
 - Brand voice surfaced in draft views
 - Published links: storefront + admin (numeric GID-based) in job + history
+- Hardcodes/DEV cleaned from core paths
+- Agent upgrades (LLM+Zod for previous stubs)
+- Memory/knowledge (full: embeddings on write + dedup, vector+text fallback retrieve, auto from brand/research, manual script+UI ingest)
+- updateDraft fixed + integrated
+- Light tests + basic loading/error UX
 - DEV cleanup and robust store selection
 
 ## Contributing

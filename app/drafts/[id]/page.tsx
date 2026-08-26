@@ -1,4 +1,4 @@
-import { getDraft } from '@/src/lib/db/drafts';
+import { getDraft, updateDraft } from '@/src/lib/db/drafts';
 import { updateJobStatus, getJob } from '@/src/lib/db/jobs';
 import { inngest } from '@/src/inngest/client';
 import Link from 'next/link';
@@ -34,6 +34,7 @@ async function decide(formData: FormData) {
       metafields,
       schemaJsonLd,
     };
+    await updateDraft(draftId, editedPayload);
   }
 
   console.log('[INNGEST] sending approval/decided', { jobId, status });

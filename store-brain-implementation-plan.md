@@ -47,7 +47,8 @@ Success for Stage A: trigger SEO job for a keyword → research → draft → hu
 3. Brand Voice agent (new, user-requested) — DONE (generate from site+web, edit in settings only, thread to SEO prompts/agents).
 4. Drafts table + richer UI for editing (metafields etc.).
 5. More autonomy enforcement (full auto-approve).
-6. ...
+6. Clean hardcodes/DEV, fix richer draft persistence (updateDraft), agent quality (LLM+Zod for stubs), UX polish, memory integration, light tests.
+7. Stage B: command center, multi-domain, next agent teams.
 
 ## Stage B/C
 - Command center polish.
@@ -74,6 +75,11 @@ Success for Stage A: trigger SEO job for a keyword → research → draft → hu
 - Requeues: now forward fresh brandVoice + platform from store config.
 - Brand voice surfaced in draft detail (fetched via job).
 - Links polished: admin GIDs (numeric IDs) + storefront for all types; light constructed links in history.
-- Updated plan + README alpha checklist.
+- Hardcodes/DEV fully cleaned from runtime (scripts support --store).
+- updateDraft fixed and integrated for edited drafts.
+- Agent quality: stubs (brief/optimize/editor/evaluate) upgraded to LLM + Zod structured where possible.
+- UX: added loading.tsx/error.tsx; memory fully implemented (write with embeddings + dedup, retrieve with vector+text fallback, auto-pop from brand/research, manual script+UI).
+- Light tests added (basic agent smoke).
+- Updated plan + README.
 
-Alpha now supports richer editing, existing page updates, auto-approve via autonomy config, better brand voice visibility, and improved published links (storefront + admin).
+Alpha now supports production-usable SEO (clean runtime, better agents, full memory with Neon/pgvector, fixed edits, UX basics).

@@ -303,7 +303,7 @@ function createBasicDraft(type: string, keyword: string, platform = 'shopify', b
   return {
     title: keyword + suffix,
     handle: keyword.toLowerCase().replace(/\s+/g, '-'),
-    bodyHtml: `<h1>${keyword}</h1><p>Basic placeholder content for ${plat}${type} about ${keyword}. This was generated as a fallback. Please review and edit.</p>`,
+    bodyHtml: `<h1>${keyword}</h1><p>Content for ${plat}${type} about ${keyword}. (Fallback generation — please review and edit.)</p>`,
     metaTitle: keyword,
     metaDescription: `Learn about ${keyword} in this ${type}.`,
     type,

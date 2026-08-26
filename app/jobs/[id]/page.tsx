@@ -183,7 +183,7 @@ export default async function JobDetail({ params }: { params: Promise<{ id: stri
               addAdmin(coll, 'collections');
               addStorefront(pg, 'pages');
               addAdmin(pg, 'pages');
-              addStorefront(art, 'blogs/news', '(blog handle may vary)');
+              addStorefront(art, 'blogs/blog', '(blog handle may vary)');
               addAdmin(art, 'articles');
               return links.length ? <div className="mt-2 text-xs"><strong>Links:</strong> {links.map((l,i)=><div key={i}>{l}</div>)}</div> : null;
             })()}

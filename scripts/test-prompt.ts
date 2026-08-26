@@ -17,14 +17,15 @@ const platIdx = args.indexOf('--platform');
 if (platIdx !== -1 && args[platIdx + 1]) platform = args[platIdx + 1];
 const keyword = args.find(a => !a.startsWith('--') && a !== cmd) || 'daikin single zone mini split';
 const type = 'collection';
-const storeId = process.env.DEV_STORE_ID as string;
+const storeArgIdx = args.indexOf('--store');
+const storeId = (storeArgIdx !== -1 ? args[storeArgIdx + 1] : process.env.DEV_STORE_ID) as string;
 if (!storeId) {
-  console.error('DEV_STORE_ID required for test script');
+  console.error('DEV_STORE_ID or --store <id> required for test script');
   process.exit(1);
 }
 
 if (cmd === 'help' || cmd === '--help') {
-  console.log('Usage: tsx scripts/test-prompt.ts <research|writer> [keyword] [--real] [--brand "voice here"] [--platform "shopify"]');
+  console.log('Usage: tsx scripts/test-prompt.ts <research|writer> [keyword] [--real] [--brand "voice here"] [--platform "shopify"] [--store <id>]');
   process.exit(0);
 }
 

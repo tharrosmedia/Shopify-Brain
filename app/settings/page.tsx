@@ -3,12 +3,15 @@ import { Button } from '@/components/ui/button';
 import { cookies } from 'next/headers';
 import { listStores, getStore, updateStore, getActiveStoreId } from '@/src/lib/db/stores';
 import { inferBrandVoice } from '@/src/lib/agents/brand/voice';
+import { writeKnowledge } from '@/src/lib/brain/memory';
+import { createAdminClient } from '@/src/lib/shopify/client';
+import { fetchStoreSamples } from '@/src/lib/shopify/content';
 
 async function resyncInngest() {
   'use server';
   const apiKey = process.env.INNGEST_API_KEY;
   const appId = 'shopify-brain';
-  const handlerUrl = process.env.PUBLIC_URL || 'https://cerevex.store/api/inngest';
+  const handlerUrl = process.env.PUBLIC_URL || 'https://your-domain.example/api/inngest';
   const { revalidatePath } = await import('next/cache');
   const { redirect } = await import('next/navigation');
   revalidatePath('/settings');
@@ -61,6 +64,38 @@ async function generateBrandVoiceAction() {
   } catch (e) {
     revalidatePath('/settings');
     redirect('/settings?brand=error');
+  }
+}
+
+async function ingestKnowledgeAction() {
+  'use server';
+  const { revalidatePath } = await import('next/cache');
+  const { redirect } = await import('next/navigation');
+  const store = await getActiveStore();
+  if (!store || !store.shopify_access_token) {
+    revalidatePath('/settings');
+    redirect('/settings?knowledge=error');
+    return;
+  }
+  try {
+    const client = createAdminClient(store.shopify_domain, store.shopify_access_token);
+    const samples = await fetchStoreSamples(client, 5);
+    for (const s of samples) {
+      await writeKnowledge(store.id, `${s.title}: ${s.body}`, {
+        type: 'shopify_sample',
+        title: s.title,
+        source: 'shopify',
+      });
+    }
+    const bv = store.config?.brandVoice?.text;
+    if (bv) {
+      await writeKnowledge(store.id, bv, { type: 'brand_voice', source: 'manual' });
+    }
+    revalidatePath('/settings');
+    redirect('/settings?knowledge=success');
+  } catch (e) {
+    revalidatePath('/settings');
+    redirect('/settings?knowledge=error');
   }
 }
 
@@ -123,8 +158,8 @@ async function saveAutonomyAction(formData: FormData) {
 
 export const dynamic = 'force-dynamic';
 
-export default async function Settings({ searchParams }: { searchParams?: Promise<{ resync?: string; brand?: string; autonomy?: string }> }) {
-  const params = await (searchParams || Promise.resolve({})) as { resync?: string; brand?: string; autonomy?: string };
+export default async function Settings({ searchParams }: { searchParams?: Promise<{ resync?: string; brand?: string; autonomy?: string; knowledge?: string }> }) {
+  const params = await (searchParams || Promise.resolve({})) as { resync?: string; brand?: string; autonomy?: string; knowledge?: string };
   const store = await getActiveStore();
   const config = store?.config || {};
   const bv = config.brandVoice || null;
@@ -146,6 +181,12 @@ export default async function Settings({ searchParams }: { searchParams?: Promis
       )}
       {params.brand === 'error' && (
         <div className="mb-4 p-3 bg-red-100 text-red-700 rounded text-sm">Error with brand voice action.</div>
+      )}
+      {params.knowledge === 'success' && (
+        <div className="mb-4 p-3 bg-green-100 text-green-700 rounded text-sm">Knowledge ingested successfully.</div>
+      )}
+      {params.knowledge === 'error' && (
+        <div className="mb-4 p-3 bg-red-100 text-red-700 rounded text-sm">Error ingesting knowledge.</div>
       )}
       {params.autonomy === 'saved' && (
         <div className="mb-4 p-3 bg-green-100 text-green-700 rounded text-sm">Autonomy saved.</div>
@@ -178,6 +219,9 @@ export default async function Settings({ searchParams }: { searchParams?: Promis
         <h2 className="font-semibold mb-4">Brand Voice</h2>
         <form action={generateBrandVoiceAction} className="mb-4">
           <Button type="submit" variant="outline">Generate / Regenerate from Site + Web</Button>
+        </form>
+        <form action={ingestKnowledgeAction} className="mb-4">
+          <Button type="submit" variant="outline">Ingest / Refresh Site Knowledge</Button>
         </form>
         <form action={saveBrandVoiceAction} className="space-y-2">
           <textarea name="brandVoiceText" defaultValue={bv?.text || ''} className="border p-2 w-full h-32 font-mono text-sm" placeholder="Brand voice description..." />
