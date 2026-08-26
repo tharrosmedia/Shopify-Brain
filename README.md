@@ -93,7 +93,7 @@ Full details (Stage A exit criteria, data model, agent steps, Inngest skeleton, 
 - Published links: storefront + admin (numeric GID-based) in job + history
 - Hardcodes/DEV cleaned from core paths
 - Agent upgrades (LLM+Zod for previous stubs)
-- Memory/knowledge (full: embeddings on write + dedup, vector+text fallback retrieve, auto from brand/research, manual script+UI ingest)
+- Memory/knowledge (full: embeddings on write + dedup, vector+text fallback retrieve, auto from brand/research + used in brand prompts, manual script+UI ingest)
 - updateDraft fixed + integrated
 - Light tests + basic loading/error UX
 - DEV cleanup and robust store selection

@@ -4,7 +4,7 @@ import { getStore } from '../../db/stores';
 import { createAdminClient } from '../../shopify/client';
 import { fetchStoreSamples, searchBrandContext } from '../../shopify/content';
 import { buildBrandVoiceMessages } from '../../prompts/brand/voice';
-import { writeKnowledge } from '../../brain/memory';
+import { writeKnowledge, retrieve } from '../../brain/memory';
 
 export async function inferBrandVoice({ storeId }: { storeId: string }) {
   const store = await getStore(storeId);
@@ -31,7 +31,8 @@ export async function inferBrandVoice({ storeId }: { storeId: string }) {
   try {
     tavilyData = await searchBrandContext(store.shopify_domain, store.name);
   } catch {}
-  const allMsgs = buildBrandVoiceMessages(samples, tavilyData);
+  const knowledge = await retrieve(storeId, store.name || 'brand', 3);
+  const allMsgs = buildBrandVoiceMessages(samples, tavilyData, knowledge);
   const sys = allMsgs.find(m => m.role === 'system')?.content;
   const userMsgs = allMsgs.filter(m => m.role !== 'system');
   const { text } = await generateText({

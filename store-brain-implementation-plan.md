@@ -78,7 +78,7 @@ Success for Stage A: trigger SEO job for a keyword → research → draft → hu
 - Hardcodes/DEV fully cleaned from runtime (scripts support --store).
 - updateDraft fixed and integrated for edited drafts.
 - Agent quality: stubs (brief/optimize/editor/evaluate) upgraded to LLM + Zod structured where possible.
-- UX: added loading.tsx/error.tsx; memory fully implemented (write with embeddings + dedup, retrieve with vector+text fallback, auto-pop from brand/research, manual script+UI).
+- UX: added loading.tsx/error.tsx; memory fully implemented (write with embeddings + dedup, retrieve with vector+text fallback, auto-pop from brand/research + used in brand prompts, manual script+UI).
 - Light tests added (basic agent smoke).
 - Updated plan + README.
 
