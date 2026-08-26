@@ -97,7 +97,7 @@ export default async function JobDetail({ params }: { params: Promise<{ id: stri
         <div><strong>Full ID:</strong> {job.id}</div>
       </div>
 
-      {['queued', 'failed'].includes(job.status) && (
+      {['queued', 'failed', 'timeout'].includes(job.status) && (
         <form action={requeueJob} className="mb-6">
           <input type="hidden" name="jobId" value={job.id} />
           <input type="hidden" name="storeId" value={job.storeId} />

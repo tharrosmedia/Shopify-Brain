@@ -22,6 +22,9 @@ Available products (use for recommendations, include in collection, link in cont
 Available metafield definitions (use SELECTIVELY only the ones that help this specific keyword/job for best SEO; you do NOT have to use all or any. It is fine to use a subset e.g. 4 out of 8. When inventing new, supply full "namespace.key" name yourself):
 ${defsStr}
 Use this brief: ${JSON.stringify(brief)}
+
+For metaTitle: make it stand out on SERP for the searcher intent in the brief. Adaptive, benefit/specific/curiosity driven, natural keyword, ~50-60 chars. No lazy titles.
+For metaDescription: speak directly to intent, benefit-focused, compelling, non-repetitive, ~155 chars.
 Return structured content. For metafields use exact "namespace.key" keys. Body and chosen metas must not duplicate content. Reference real product titles/handles where they fit naturally.`;
 
   const { object } = await generateObject({

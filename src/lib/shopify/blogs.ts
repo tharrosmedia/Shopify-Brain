@@ -28,7 +28,7 @@ export async function getFirstBlogId(adminClient: any): Promise<string> {
 
 import { getOnlineStorePublicationId, publishResource } from './publications';
 
-export async function createAndPublishArticle(adminClient: any, input: { title: string; handle?: string; bodyHtml?: string }) {
+export async function createAndPublishArticle(adminClient: any, input: { title: string; handle?: string; bodyHtml?: string; seoTitle?: string; seoDescription?: string }) {
   const blogId = await getFirstBlogId(adminClient);
   const mutation = `
     mutation createArticle($article: ArticleInput!, $blog: ArticleBlogInput!) {
@@ -38,7 +38,7 @@ export async function createAndPublishArticle(adminClient: any, input: { title: 
       }
     }
   `;
-  const variables = {
+  const variables: any = {
     article: {
       title: input.title,
       handle: input.handle,
@@ -48,6 +48,12 @@ export async function createAndPublishArticle(adminClient: any, input: { title: 
       id: blogId,
     },
   };
+  if (input.seoTitle || input.seoDescription) {
+    variables.article.seo = {
+      title: input.seoTitle || undefined,
+      description: input.seoDescription || undefined,
+    };
+  }
   const response = await adminClient.request(mutation, { variables });
   const errors = response?.data?.articleCreate?.userErrors || [];
   if (errors.length) {

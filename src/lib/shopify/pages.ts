@@ -1,6 +1,6 @@
 import { getOnlineStorePublicationId, publishResource } from './publications';
 
-export async function createAndPublishPage(adminClient: any, input: { title: string; handle?: string; bodyHtml?: string }) {
+export async function createAndPublishPage(adminClient: any, input: { title: string; handle?: string; bodyHtml?: string; seoTitle?: string; seoDescription?: string }) {
   const mutation = `
     mutation createPage($input: PageInput!) {
       pageCreate(input: $input) {
@@ -9,13 +9,19 @@ export async function createAndPublishPage(adminClient: any, input: { title: str
       }
     }
   `;
-  const variables = {
+  const variables: any = {
     input: {
       title: input.title,
       handle: input.handle,
       body: input.bodyHtml || '',
     },
   };
+  if (input.seoTitle || input.seoDescription) {
+    variables.input.seo = {
+      title: input.seoTitle || undefined,
+      description: input.seoDescription || undefined,
+    };
+  }
   const response = await adminClient.request(mutation, { variables });
   const errors = response?.data?.pageCreate?.userErrors || [];
   if (errors.length) {
@@ -33,7 +39,7 @@ export async function createAndPublishPage(adminClient: any, input: { title: str
 // Back-compat alias
 export const createDraftPage = createAndPublishPage;
 
-export async function updatePage(adminClient: any, id: string, input: { title?: string; handle?: string; bodyHtml?: string }) {
+export async function updatePage(adminClient: any, id: string, input: { title?: string; handle?: string; bodyHtml?: string; seoTitle?: string; seoDescription?: string }) {
   const mutation = `
     mutation updatePage($id: ID!, $input: PageInput!) {
       pageUpdate(id: $id, input: $input) {
@@ -42,7 +48,7 @@ export async function updatePage(adminClient: any, id: string, input: { title?: 
       }
     }
   `;
-  const variables = {
+  const variables: any = {
     id,
     input: {
       title: input.title,
@@ -50,6 +56,12 @@ export async function updatePage(adminClient: any, id: string, input: { title?: 
       body: input.bodyHtml || '',
     },
   };
+  if (input.seoTitle || input.seoDescription) {
+    variables.input.seo = {
+      title: input.seoTitle || undefined,
+      description: input.seoDescription || undefined,
+    };
+  }
   const response = await adminClient.request(mutation, { variables });
   const errors = response?.data?.pageUpdate?.userErrors || [];
   if (errors.length) {

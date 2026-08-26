@@ -1,6 +1,6 @@
 import { getOnlineStorePublicationId, publishResource } from './publications';
 
-export async function createAndPublishCollection(adminClient: any, input: { title: string; handle?: string; bodyHtml?: string; }) {
+export async function createAndPublishCollection(adminClient: any, input: { title: string; handle?: string; bodyHtml?: string; seoTitle?: string; seoDescription?: string; }) {
   const mutation = `
     mutation createCollection($input: CollectionInput!) {
       collectionCreate(input: $input) {
@@ -9,13 +9,19 @@ export async function createAndPublishCollection(adminClient: any, input: { titl
       }
     }
   `;
-  const variables = {
+  const variables: any = {
     input: {
       title: input.title,
       handle: input.handle,
       descriptionHtml: input.bodyHtml || '',
     },
   };
+  if (input.seoTitle || input.seoDescription) {
+    variables.input.seo = {
+      title: input.seoTitle || undefined,
+      description: input.seoDescription || undefined,
+    };
+  }
   const response = await adminClient.request(mutation, { variables });
   const errors = response?.data?.collectionCreate?.userErrors || [];
   if (errors.length) {

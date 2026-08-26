@@ -4,7 +4,7 @@ export function buildWriterUserPrompt({ brief, type = 'collection', brandVoice, 
   const plat = platform || brief.platform || '';
   const p = plat ? `${plat} ` : '';
   const bv = brandVoice ? (typeof brandVoice === 'string' ? brandVoice : brandVoice.text || '') : '';
-  return `for a ${p}${type} about keyword "${brief.keyword}".${bv ? ' Brand voice: ' + bv + '.' : ''} Use this brief: ${JSON.stringify(brief)}. Primary goal: best SEO for this keyword. Use metafields selectively.`;
+  return `for a ${p}${type} about keyword "${brief.keyword}".${bv ? ' Brand voice: ' + bv + '.' : ''} Use this brief: ${JSON.stringify(brief)}. Primary goal: best SEO for this keyword. Use metafields selectively. metaTitle must stand out for searcher intent (adaptive, ~55 chars). metaDescription must speak to intent (~155 chars, benefit focused).`;
 }
 
 export function buildWriterMessages(args: { brief: any; type?: string; brandVoice?: any; platform?: string }) {
@@ -14,7 +14,10 @@ export function buildWriterMessages(args: { brief: any; type?: string; brandVoic
   const bv = brandVoice ? (typeof brandVoice === 'string' ? brandVoice : brandVoice.text || '') : '';
   const bvPart = bv ? ` Follow this brand voice: ${bv}.` : '';
   return [
-    { role: 'system' as const, content: `Write high-quality SEO content for a ${p}${type} about keyword "${brief.keyword}".${bvPart} Use available metafield defs and placement selectively (only what helps this job/keyword for best SEO; subset or invented "namespace.key" OK; no duplication). Full store schema (all types) is in knowledge for context; focus on relevant for this job. Use real products from context for recommendations and collections.` },
+    { role: 'system' as const, content: `Write high-quality SEO content for a ${p}${type} about keyword "${brief.keyword}".${bvPart} Use available metafield defs and placement selectively (only what helps this job/keyword for best SEO; subset or invented "namespace.key" OK; no duplication). Full store schema (all types) is in knowledge for context; focus on relevant for this job. Use real products from context for recommendations and collections.
+
+CRITICAL - metaTitle must stand out in SERPs for the exact searcher intent from the brief: adaptive, benefit or specificity driven, natural keyword placement, ~50-60 chars. Avoid lazy titles.
+metaDescription: directly solves intent with value, ~155 chars, compelling and non-repetitive.` },
     { role: 'user' as const, content: `Use this brief: ${JSON.stringify(brief)}` }
   ];
 }

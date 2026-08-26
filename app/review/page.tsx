@@ -51,19 +51,17 @@ export default async function Review({ searchParams }: { searchParams: Promise<{
             <th className="p-2 text-left">Title</th>
             <th className="p-2 text-left">Type</th>
             <th className="p-2 text-left">Handle</th>
-            <th className="p-2 text-left">Score</th>
             <th className="p-2 text-left">Created</th>
             <th className="p-2">Actions</th>
           </tr>
         </thead>
         <tbody>
-          {drafts.length === 0 && !loadError && <tr><td colSpan={6} className="p-4 text-muted-foreground">No pending drafts</td></tr>}
+          {drafts.length === 0 && !loadError && <tr><td colSpan={5} className="p-4 text-muted-foreground">No pending drafts</td></tr>}
           {drafts.map((d: any) => (
             <tr key={d.id} className="border-t">
               <td className="p-2">{d.title}</td>
               <td className="p-2">{d.type}</td>
               <td className="p-2">{d.handle}</td>
-              <td className="p-2">{d.evaluationScores?.score || '-'}</td>
               <td className="p-2 text-sm">{new Date(d.createdAt).toLocaleString()}</td>
               <td className="p-2 space-x-2">
                 <Link href={`/drafts/${d.id}`} className="underline">View &amp; Decide</Link>

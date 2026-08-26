@@ -85,6 +85,8 @@ export async function publishContent({ storeId, draft, type = 'collection', plat
   const mainInput: any = {
     title: draft.title,
     handle: draft.handle,
+    seoTitle: draft.metaTitle,
+    seoDescription: draft.metaDescription,
   };
   if (useMainBody && bodyForMain !== undefined) {
     mainInput.bodyHtml = bodyForMain || '';
@@ -116,8 +118,15 @@ export async function publishContent({ storeId, draft, type = 'collection', plat
     response = await createAndPublishCollection(client, mainInput);
   }
   const ownerId = getResourceId(response, type);
+  const warnings: string[] = [];
+
   if (ownerId && mfs.length > 0) {
-    await setMetafields(client, ownerId, mfs);
+    try {
+      await setMetafields(client, ownerId, mfs);
+    } catch (e: any) {
+      warnings.push(`metafields: ${e?.message || e}`);
+      console.warn('[PUBLISH] setMetafields failed (non-fatal)', e);
+    }
   }
 
   // Handle products for collections (configurable via placement.collection.products)
@@ -136,12 +145,15 @@ export async function publishContent({ storeId, draft, type = 'collection', plat
           const handles = products.slice(0, 5).map((p: any) => p.handle).filter(Boolean);
           await setCollectionRules(client, ownerId, handles);
         }
-      } catch (e) {
-        console.warn('[PUBLISH] product add to collection failed', e);
+      } catch (e: any) {
+        warnings.push(`products: ${e?.message || e}`);
+        console.warn('[PUBLISH] product add to collection failed (non-fatal)', e);
       }
     }
   }
-  return response;
+
+  // Always return success info for the main resource + any warnings
+  return { ...response, __ownerId: ownerId, __warnings: warnings };
 }
 
 export const publishCatalogPage = publishContent;

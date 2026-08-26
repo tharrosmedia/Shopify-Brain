@@ -6,6 +6,8 @@ import { writeDraftFn } from './write-draft';
 import { editDraftFn } from './edit-draft';
 import { optimizeDraftFn } from './optimize-draft';
 import { evaluateFn } from './evaluate';
+import { gradeDraftFn } from './grade-draft';
+import { reviseDraftFn } from './revise-draft';
 import { saveDraftFn } from './save-draft';
 import { updateJobStatusFn } from '../update-job-status';
 import { logEventFn } from '../log-event';
@@ -187,10 +189,42 @@ export const seoJob = inngest.createFunction(
         data: { storeId, draft: edited, type, platform, brandVoice, metafieldDefinitions, placement, products },
       });
 
-      scores = await step.invoke('evaluate', {
-        function: evaluateFn,
-        data: { draft: optimized, type, platform, brandVoice, metafieldDefinitions, placement, products },
+      // Internal grader-driven iteration: rewrite until >= 8.5/10 or max 8 iterations.
+      // Grader provides feedback; revise can change ANY fields (title, handle, metas, body, metafields...).
+      // Brief + research passed so intent is used for SERP-adaptive titles etc.
+      let current = optimized;
+      scores = await step.invoke('grade', {
+        function: gradeDraftFn,
+        data: { draft: current, type, platform, brandVoice, metafieldDefinitions, placement, products, brief, research: researchResult },
       });
+
+      let iterations = 0;
+      const MAX_ITER = 8;
+      while (iterations < MAX_ITER && (scores?.score ?? 0) < 8.5) {
+        iterations += 1;
+        await step.invoke('log-iteration', {
+          function: logEventFn,
+          data: { storeId, actor: 'system', action: 'job.iteration', payload: { iteration: iterations, score: scores?.score || 0, suggestions: scores?.suggestions || [] }, jobId: job.id },
+        });
+
+        current = await step.invoke('revise', {
+          function: reviseDraftFn,
+          data: { draft: current, feedback: scores, type, platform, brandVoice, metafieldDefinitions, placement, products, brief, research: researchResult },
+        });
+
+        // Re-optimize meta/schema after revision
+        current = await step.invoke('optimize', {
+          function: optimizeDraftFn,
+          data: { storeId, draft: current, type, platform, brandVoice, metafieldDefinitions, placement, products },
+        });
+
+        scores = await step.invoke('grade', {
+          function: gradeDraftFn,
+          data: { draft: current, type, platform, brandVoice, metafieldDefinitions, placement, products, brief, research: researchResult },
+        });
+      }
+
+      optimized = current;
 
       draftRecord = await step.invoke('save-draft', {
         function: saveDraftFn,
@@ -256,10 +290,10 @@ export const seoJob = inngest.createFunction(
           });
           if (job?.id) {
             try {
-              await step.invoke('update-timeout', {
-                function: updateJobStatusFn,
-                data: { jobId: job.id, status: 'failed' },
-              });
+               await step.invoke('update-timeout', {
+                 function: updateJobStatusFn,
+                 data: { jobId: job.id, status: 'timeout' },
+               });
             } catch {}
           }
           return { status: 'no-decision' };
@@ -322,21 +356,34 @@ export const seoJob = inngest.createFunction(
 
       const finalDraft = approvalData.status === 'edited' && approvalData.editedPayload ? approvalData.editedPayload : optimized;
 
-      const result = await step.invoke('publish', {
-        function: publishFn,
-        data: { storeId, draft: finalDraft, type, platform, brandVoice, products },
-      });
+      let result: any;
+      try {
+        result = await step.invoke('publish', {
+          function: publishFn,
+          data: { storeId, draft: finalDraft, type, platform, brandVoice, products },
+        });
+      } catch (pubErr: any) {
+        // If publish itself threw before creating the resource, we will fail below
+        console.error('[PUBLISH] hard failure', pubErr);
+        result = { error: pubErr?.message || String(pubErr) };
+      }
 
-      await step.invoke('update-job-completed', {
-        function: updateJobStatusFn,
-        data: { jobId: job.id, status: 'completed', output: result },
-      });
-      await step.invoke('log-completed', {
-        function: logEventFn,
-        data: { storeId, actor: 'system', action: 'job.completed', payload: { shopify: result }, jobId: job.id },
-      });
+      const hasMainResource = !!(result && (result.__ownerId || (result.data && (result.data.collectionCreate || result.data.pageCreate || result.data.articleCreate))));
 
-      return { status: 'completed', shopifyResult: result };
+      if (hasMainResource || !result?.error) {
+        await step.invoke('update-job-completed', {
+          function: updateJobStatusFn,
+          data: { jobId: job.id, status: 'completed', output: result },
+        });
+        await step.invoke('log-completed', {
+          function: logEventFn,
+          data: { storeId, actor: 'system', action: 'job.completed', payload: { shopify: result, warnings: result?.__warnings || [] }, jobId: job.id },
+        });
+        return { status: 'completed', shopifyResult: result };
+      }
+
+      // Only reach here on hard failure to create the main resource
+      throw new Error('Publish failed to create main resource');
     } catch (err: any) {
       console.error('SEO job failed', err);
       if (job?.id) {

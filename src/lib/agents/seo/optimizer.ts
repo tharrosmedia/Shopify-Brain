@@ -16,7 +16,25 @@ export async function optimizeDraft({ storeId, draft, type = 'collection', platf
     const { object } = await generateObject({
       model: xai(XAI_MODEL),
       schema: OptimizeSchema,
-      prompt: `Optimize meta and schema for a ${type} about "${base}". Brand voice: ${bv}. Platform: ${platform}. Current title: ${base}. Selectively refine any chosen metafields if they help SEO (job-first). Products available: ${products.slice(0,3).map((p:any)=>p.title).join(', ')}. Defs: ${defsStr}. Provide improved metaTitle, metaDescription, and schemaJsonLd object with @type appropriate for ${type}.`,
+      prompt: `Optimize metaTitle, metaDescription and schema for a ${type} about "${base}".
+Searcher intent and angles from brief/research must drive the copy.
+Brand voice: ${bv}. Platform: ${platform}.
+Current title: ${base}.
+Products available: ${products.slice(0,3).map((p:any)=>p.title).join(', ')}. Defs: ${defsStr}.
+
+CRITICAL for metaTitle (make it stand out in SERPs):
+- Speak directly and completely to the searcher's intent.
+- Adaptive: use benefit, specificity, numbers, comparison, audience, question or power words as appropriate for the topic and competition.
+- Natural primary keyword placement, not stuffed. Avoid lazy patterns like just the keyword or "Keyword | Options".
+- 50-60 characters ideal.
+
+CRITICAL for metaDescription:
+- Directly addresses the intent with unique value, key benefit or proof.
+- Benefit-focused, clear, compelling. ~150-160 characters.
+- No repetition of body text or generic filler. No keyword stuffing.
+- End with a light CTA or reason to choose when natural.
+
+Selectively refine any metafields. Provide improved metaTitle, metaDescription, and schemaJsonLd object with @type appropriate for ${type}.`,
     });
     return { ...draft, ...object, brandVoice, type, platform };
   } catch {

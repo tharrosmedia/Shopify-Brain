@@ -6,6 +6,8 @@ import { writeDraftFn } from './functions/seo/write-draft';
 import { editDraftFn } from './functions/seo/edit-draft';
 import { optimizeDraftFn } from './functions/seo/optimize-draft';
 import { evaluateFn } from './functions/seo/evaluate';
+import { gradeDraftFn } from './functions/seo/grade-draft';
+import { reviseDraftFn } from './functions/seo/revise-draft';
 import { saveDraftFn } from './functions/seo/save-draft';
 import { saveApprovalFn } from './functions/seo/save-approval';
 import { publishFn } from './functions/seo/publish';
@@ -22,6 +24,8 @@ export const functions = [
   editDraftFn,
   optimizeDraftFn,
   evaluateFn,
+  gradeDraftFn,
+  reviseDraftFn,
   saveDraftFn,
   saveApprovalFn,
   publishFn,
