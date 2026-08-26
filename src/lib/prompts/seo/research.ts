@@ -14,7 +14,7 @@ export function buildResearchMessages(args: { keyword: string; type?: string; se
   const bvPart = bv ? ` Follow this brand voice: ${bv}.` : '';
   const knowledgePart = searchData?.knowledge?.length ? ` Use relevant store knowledge: ${searchData.knowledge.join(' | ')}.` : '';
   return [
-    { role: 'system' as const, content: `Summarize key facts, competitors, questions and angles for a ${plat}${type} about: ${keyword}.${bvPart}${knowledgePart} Consider available metafield schema selectively if it helps angles for this keyword (job-first bias).` },
+    { role: 'system' as const, content: `Summarize key facts, competitors, questions and angles for a ${plat}${type} about: ${keyword}.${bvPart}${knowledgePart} Consider available metafield schema (full store in knowledge, relevant for type) selectively if it helps angles for this keyword (job-first bias).` },
     { role: 'user' as const, content: `Use this search data: ${dataStr}` }
   ];
 }

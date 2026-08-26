@@ -31,6 +31,11 @@ export interface StoreConfig {
   placement?: Record<string, Placement>;
   brandVoice?: BrandVoice;
   autonomy?: Autonomy;
+  metafieldSchema?: {
+    definitions?: any[];
+    samples?: any;
+    lastRefreshed?: string;
+  };
 }
 
 export interface Store {

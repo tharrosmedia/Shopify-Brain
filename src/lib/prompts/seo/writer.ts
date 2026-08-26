@@ -14,7 +14,7 @@ export function buildWriterMessages(args: { brief: any; type?: string; brandVoic
   const bv = brandVoice ? (typeof brandVoice === 'string' ? brandVoice : brandVoice.text || '') : '';
   const bvPart = bv ? ` Follow this brand voice: ${bv}.` : '';
   return [
-    { role: 'system' as const, content: `Write high-quality SEO content for a ${p}${type} about keyword "${brief.keyword}".${bvPart} Use available metafield defs and placement selectively (only what helps this job/keyword for best SEO; subset or invented "namespace.key" OK; no duplication).` },
+    { role: 'system' as const, content: `Write high-quality SEO content for a ${p}${type} about keyword "${brief.keyword}".${bvPart} Use available metafield defs and placement selectively (only what helps this job/keyword for best SEO; subset or invented "namespace.key" OK; no duplication). Full store schema (all types) is in knowledge for context; focus on relevant for this job.` },
     { role: 'user' as const, content: `Use this brief: ${JSON.stringify(brief)}` }
   ];
 }

@@ -15,7 +15,7 @@ import { updateJobStatus } from '../../../lib/db/jobs';
 import { logEvent } from '../../../lib/brain/events';
 import { getStore } from '../../../lib/db/stores';
 import { createAdminClient } from '../../../lib/shopify/client';
-import { fetchMetafieldDefinitions } from '../../../lib/shopify/content';
+import { fetchMetafieldDefinitions, fetchMetafieldValueSamples } from '../../../lib/shopify/content';
 import { writeKnowledge } from '../../../lib/brain/memory';
 
 export const seoJob = inngest.createFunction(
@@ -79,9 +79,10 @@ export const seoJob = inngest.createFunction(
 
     let researchResult: any, brief: any, draft: any, edited: any, optimized: any, scores: any, draftRecord: any;
 
-    // Load placement + live metafield defs early so agents can be aware (job-first bias)
+    // Load placement + live metafield defs. Pass only RELEVANT for this job type (per preference).
+    // But always ensure FULL schema + values are in knowledge for store-wide awareness.
     let placement: any = {};
-    let metafieldDefinitions: any[] = [];
+    let metafieldDefinitions: any[] = []; // relevant slice for this job
     try {
       const store = await getStore(storeId);
       if (store?.config?.placement) {
@@ -92,6 +93,18 @@ export const seoJob = inngest.createFunction(
         const allDefs = await fetchMetafieldDefinitions(client);
         const ownerType = type === 'collection' ? 'COLLECTION' : type === 'page' ? 'PAGE' : type === 'blog' ? 'ARTICLE' : 'COLLECTION';
         metafieldDefinitions = allDefs.filter((d: any) => d.ownerType === ownerType);
+
+        // Write FULL schema + samples to memory (for agent's overall store mind)
+        try {
+          const valueSamples = await fetchMetafieldValueSamples(client);
+          await writeKnowledge(storeId, `Full store metafield schema and examples: ${JSON.stringify(valueSamples)}`, {
+            type: 'metafield_schema_full', source: 'job'
+          });
+        } catch (e) {
+          console.warn('[SEO] failed to write full metafield samples', e);
+        }
+
+        // Still write relevant for job context
         if (metafieldDefinitions.length > 0) {
           const schemaSummary = metafieldDefinitions.map((d: any) => ({
             name: d.name, namespace: d.namespace, key: d.key, type: d.type?.name, description: d.description

@@ -129,3 +129,137 @@ export async function fetchMetafieldDefinitions(adminClient: any) {
   }
   return defs;
 }
+
+export async function fetchMetafieldValueSamples(adminClient: any) {
+  const defs = await fetchMetafieldDefinitions(adminClient);
+  const result: Record<string, { definitions: any[]; examples: any[] }> = {
+    COLLECTION: { definitions: [], examples: [] },
+    PRODUCT: { definitions: [], examples: [] },
+    PAGE: { definitions: [], examples: [] },
+    ARTICLE: { definitions: [], examples: [] },
+    SHOP: { definitions: [], examples: [] },
+  };
+
+  // Attach definitions
+  defs.forEach((d: any) => {
+    if (result[d.ownerType]) result[d.ownerType].definitions.push(d);
+  });
+
+  // Sample actual values (limited to keep cheap)
+  try {
+    // Collections
+    const collQ = `
+      query {
+        collections(first: 3) {
+          edges {
+            node {
+              title
+              metafields(first: 10) {
+                edges { node { namespace key value type } }
+              }
+            }
+          }
+        }
+      }
+    `;
+    const collRes = await adminClient.request(collQ, {});
+    (collRes?.data?.collections?.edges || []).forEach((e: any) => {
+      const mfs = (e.node.metafields?.edges || []).map((me: any) => me.node);
+      if (mfs.length) result.COLLECTION.examples.push({ title: e.node.title, metafields: mfs });
+    });
+  } catch {}
+
+  try {
+    // Products
+    const prodQ = `
+      query {
+        products(first: 3, sortKey: BEST_SELLING) {
+          edges {
+            node {
+              title
+              metafields(first: 10) {
+                edges { node { namespace key value type } }
+              }
+            }
+          }
+        }
+      }
+    `;
+    const prodRes = await adminClient.request(prodQ, {});
+    (prodRes?.data?.products?.edges || []).forEach((e: any) => {
+      const mfs = (e.node.metafields?.edges || []).map((me: any) => me.node);
+      if (mfs.length) result.PRODUCT.examples.push({ title: e.node.title, metafields: mfs });
+    });
+  } catch {}
+
+  try {
+    // Shop level
+    const shopQ = `
+      query {
+        shop {
+          name
+          metafields(first: 10) {
+            edges { node { namespace key value type } }
+          }
+        }
+      }
+    `;
+    const shopRes = await adminClient.request(shopQ, {});
+    const shop = shopRes?.data?.shop || shopRes?.shop;
+    if (shop?.metafields?.edges?.length) {
+      const mfs = shop.metafields.edges.map((me: any) => me.node);
+      result.SHOP.examples.push({ title: shop.name || 'Shop', metafields: mfs });
+    }
+  } catch {}
+
+  try {
+    // Pages
+    const pageQ = `
+      query {
+        pages(first: 3) {
+          edges {
+            node {
+              title
+              metafields(first: 10) {
+                edges { node { namespace key value type } }
+              }
+            }
+          }
+        }
+      }
+    `;
+    const pageRes = await adminClient.request(pageQ, {});
+    (pageRes?.data?.pages?.edges || []).forEach((e: any) => {
+      const mfs = (e.node.metafields?.edges || []).map((me: any) => me.node);
+      if (mfs.length) result.PAGE.examples.push({ title: e.node.title, metafields: mfs });
+    });
+  } catch {}
+
+  try {
+    // Articles (blog)
+    const blog = await getFirstBlog(adminClient);
+    const artQ = `
+      query {
+        blog(id: "${blog.id}") {
+          articles(first: 3) {
+            edges {
+              node {
+                title
+                metafields(first: 10) {
+                  edges { node { namespace key value type } }
+                }
+              }
+            }
+          }
+        }
+      }
+    `;
+    const artRes = await adminClient.request(artQ, {});
+    (artRes?.data?.blog?.articles?.edges || []).forEach((e: any) => {
+      const mfs = (e.node.metafields?.edges || []).map((me: any) => me.node);
+      if (mfs.length) result.ARTICLE.examples.push({ title: e.node.title, metafields: mfs });
+    });
+  } catch {}
+
+  return result;
+}
