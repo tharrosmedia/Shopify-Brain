@@ -287,7 +287,7 @@ async function syncProductsAction() {
       config: newConfig,
     });
     revalidatePath('/settings');
-    redirect('/settings?products=synced');
+    redirect(`/settings?products=synced&count=${result.synced}`);
   } catch (e) {
     revalidatePath('/settings');
     redirect('/settings?products=error');
@@ -296,8 +296,8 @@ async function syncProductsAction() {
 
 export const dynamic = 'force-dynamic';
 
-export default async function Settings({ searchParams }: { searchParams?: Promise<{ resync?: string; brand?: string; autonomy?: string; knowledge?: string; url?: string; status?: string; message?: string; placement?: string; placementReason?: string; metafields?: string; products?: string }> }) {
-  const params = await (searchParams || Promise.resolve({})) as { resync?: string; brand?: string; autonomy?: string; knowledge?: string; url?: string; status?: string; message?: string; placement?: string; placementReason?: string; metafields?: string; products?: string };
+export default async function Settings({ searchParams }: { searchParams?: Promise<{ resync?: string; brand?: string; autonomy?: string; knowledge?: string; url?: string; status?: string; message?: string; placement?: string; placementReason?: string; metafields?: string; products?: string; count?: string }> }) {
+  const params = await (searchParams || Promise.resolve({})) as { resync?: string; brand?: string; autonomy?: string; knowledge?: string; url?: string; status?: string; message?: string; placement?: string; placementReason?: string; metafields?: string; products?: string; count?: string };
   const store = await getActiveStore();
   const config = store?.config || {};
   const bv = config.brandVoice || null;
@@ -360,7 +360,7 @@ export default async function Settings({ searchParams }: { searchParams?: Promis
         <div className="mb-4 p-3 bg-red-100 text-red-700 rounded text-sm">Error refreshing metafield schema (check store token/permissions).</div>
       )}
       {params.products === 'synced' && (
-        <div className="mb-4 p-3 bg-green-100 text-green-700 rounded text-sm">Products synced successfully (titles, descriptions, handles, images, metafields).</div>
+        <div className="mb-4 p-3 bg-green-100 text-green-700 rounded text-sm">Products synced successfully ({params.count || '0'} imported: titles, descriptions, handles, images, metafields).</div>
       )}
       {params.products === 'error' && (
         <div className="mb-4 p-3 bg-red-100 text-red-700 rounded text-sm">Error syncing products (check store token with read_products scope).</div>

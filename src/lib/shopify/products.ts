@@ -8,9 +8,10 @@ export async function fetchProducts(adminClient: any, options: { limit?: number;
 
   while (hasNextPage && (!limit || limit <= 0 || products.length < limit)) {
     const first = Math.min(50, (limit && limit > 0) ? limit - products.length : 50);
+    const hasQuery = !!query;
     let q = `
-      query($first: Int!, $after: String, $query: String) {
-        products(first: $first, after: $after, query: $query, sortKey: BEST_SELLING) {
+      query($first: Int!, $after: String${hasQuery ? ', $query: String' : ''}) {
+        products(first: $first, after: $after${hasQuery ? ', query: $query' : ''}, sortKey: BEST_SELLING) {
           edges {
             node {
               id
@@ -48,8 +49,13 @@ export async function fetchProducts(adminClient: any, options: { limit?: number;
       }
     `;
 
-    const variables: any = { first, after: cursor, query: query || null };
+    const variables: any = { first, after: cursor };
+    if (hasQuery) variables.query = query;
     const res = await adminClient.request(q, { variables });
+    if (res.errors && res.errors.length > 0) {
+      console.error('[Shopify] Products fetch errors:', res.errors);
+      throw new Error(res.errors.map((e: any) => e.message || e).join('; '));
+    }
     const edges = res?.data?.products?.edges || [];
 
     for (const e of edges) {
