@@ -101,7 +101,8 @@ export const seoJob = inngest.createFunction(
         // Write FULL schema + samples to memory (for agent's overall store mind)
         try {
           const valueSamples = await fetchMetafieldValueSamples(client);
-          await writeKnowledge(storeId, `Full store metafield schema and examples: ${JSON.stringify(valueSamples)}`, {
+          const schemaStr = JSON.stringify(valueSamples).slice(0, 8000);
+          await writeKnowledge(storeId, `Full store metafield schema and examples: ${schemaStr}`, {
             type: 'metafield_schema_full', source: 'job'
           });
         } catch (e) {
@@ -189,7 +190,8 @@ export const seoJob = inngest.createFunction(
         data: { storeId, draft: edited, type, platform, brandVoice, metafieldDefinitions, placement, products },
       });
 
-      // Internal grader-driven iteration: rewrite until >= 8.5/10 or max 8 iterations.
+      // Internal grader-driven iteration (strictly internal helpers, no standalone event triggers).
+      // rewrite until >= 8.5/10 or max 8 iterations.
       // Grader provides feedback; revise can change ANY fields (title, handle, metas, body, metafields...).
       // Brief + research passed so intent is used for SERP-adaptive titles etc.
       let current = optimized;

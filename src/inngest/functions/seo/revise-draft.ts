@@ -2,7 +2,9 @@ import { inngest } from '../../client';
 import { reviseDraft } from '../../../lib/agents/seo/revise-draft';
 
 export const reviseDraftFn = inngest.createFunction(
-  { id: 'seo-revise-draft', retries: 2, triggers: [{ event: 'seo/revise-draft' }] },
+  // Internal-only (no event triggers). Invoked exclusively via step.invoke from the main seo-job
+  // as part of the grader-driven revision loop. Do not trigger directly.
+  { id: 'seo-revise-draft', retries: 2 },
   async ({ event, step }: any) => {
     const { draft, feedback, type = 'collection', platform, brandVoice, metafieldDefinitions, placement, products, brief, research } = event.data;
     return await step.run('revise-draft', async () => {

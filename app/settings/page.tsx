@@ -37,6 +37,9 @@ async function resyncInngest() {
     }
     redirect('/settings?resync=success');
   } catch (e: any) {
+    if (e?.digest?.startsWith('NEXT_REDIRECT')) {
+      throw e;
+    }
     revalidatePath('/settings');
     redirect(`/settings?resync=error&url=${encodeURIComponent(handlerUrl)}&message=${encodeURIComponent(e?.message || 'network error')}`);
   }
@@ -58,6 +61,11 @@ async function generateBrandVoiceAction() {
     redirect('/settings?brand=error');
     return;
   }
+  if (!process.env.XAI_API_KEY) {
+    revalidatePath('/settings');
+    redirect('/settings?brand=error&message=' + encodeURIComponent('XAI_API_KEY is required for brand voice inference'));
+    return;
+  }
   try {
     const bv = await inferBrandVoice({ storeId: store.id });
     const currentConfig = store.config || {};
@@ -71,9 +79,14 @@ async function generateBrandVoiceAction() {
     });
     revalidatePath('/settings');
     redirect('/settings?brand=generated');
-  } catch (e) {
+  } catch (e: any) {
+    if (e?.digest?.startsWith('NEXT_REDIRECT')) {
+      throw e;
+    }
+    console.error('[generateBrandVoiceAction] failed:', e);
     revalidatePath('/settings');
-    redirect('/settings?brand=error');
+    const msg = e?.message || 'unknown error';
+    redirect('/settings?brand=error&message=' + encodeURIComponent(msg));
   }
 }
 
@@ -104,15 +117,21 @@ async function ingestKnowledgeAction() {
     // Also refresh full metafield schema + values
     try {
       const mf = await fetchMetafieldValueSamples(client);
-      await writeKnowledge(store.id, `Full store metafield schema and current values: ${JSON.stringify(mf)}`, {
+      const schemaStr = JSON.stringify(mf).slice(0, 8000);
+      await writeKnowledge(store.id, `Full store metafield schema and current values: ${schemaStr}`, {
         type: 'metafield_schema_full', source: 'ingest',
       });
     } catch {}
     revalidatePath('/settings');
     redirect('/settings?knowledge=success');
-  } catch (e) {
+  } catch (e: any) {
+    if (e?.digest?.startsWith('NEXT_REDIRECT')) {
+      throw e;
+    }
+    console.error('[ingestKnowledgeAction] failed:', e);
     revalidatePath('/settings');
-    redirect('/settings?knowledge=error');
+    const msg = e?.message || 'unknown error';
+    redirect('/settings?knowledge=error&message=' + encodeURIComponent(msg));
   }
 }
 
@@ -212,7 +231,10 @@ async function generatePlacementSuggestion() {
     const json = JSON.stringify(suggestedConfig, null, 2);
     revalidatePath('/settings');
     redirect(`/settings?placement=${encodeURIComponent(json)}${hasReason ? '&placementReason=merge' : ''}`);
-  } catch (e) {
+  } catch (e: any) {
+    if (e?.digest?.startsWith('NEXT_REDIRECT')) {
+      throw e;
+    }
     revalidatePath('/settings');
     redirect('/settings?placement=error');
   }
@@ -231,8 +253,9 @@ async function refreshMetafieldSchema() {
   try {
     const client = createAdminClient(store.shopify_domain, store.shopify_access_token);
     const samples = await fetchMetafieldValueSamples(client);
-    // Write full schema + values to knowledge
-    await writeKnowledge(store.id, `Full store metafield schema and current values: ${JSON.stringify(samples)}`, {
+    // Write full schema + values to knowledge (truncated to avoid large payload issues)
+    const schemaStr = JSON.stringify(samples).slice(0, 8000);
+    await writeKnowledge(store.id, `Full store metafield schema and current values: ${schemaStr}`, {
       type: 'metafield_schema_full',
       source: 'refresh',
     });
@@ -255,9 +278,14 @@ async function refreshMetafieldSchema() {
     });
     revalidatePath('/settings');
     redirect('/settings?metafields=refreshed');
-  } catch (e) {
+  } catch (e: any) {
+    if (e?.digest?.startsWith('NEXT_REDIRECT')) {
+      throw e;
+    }
+    console.error('[refreshMetafieldSchema] failed:', e);
     revalidatePath('/settings');
-    redirect('/settings?metafields=error');
+    const msg = e?.message || 'unknown error';
+    redirect('/settings?metafields=error&message=' + encodeURIComponent(msg));
   }
 }
 
@@ -289,6 +317,9 @@ async function syncProductsAction() {
     revalidatePath('/settings');
     redirect(`/settings?products=synced&count=${result.synced}`);
   } catch (e: any) {
+    if (e?.digest?.startsWith('NEXT_REDIRECT')) {
+      throw e;
+    }
     revalidatePath('/settings');
     const msg = e?.message || 'Failed to sync products';
     redirect(`/settings?products=error&message=${encodeURIComponent(msg)}`);
@@ -330,13 +361,19 @@ export default async function Settings({ searchParams }: { searchParams?: Promis
         <div className="mb-4 p-3 bg-green-100 text-green-700 rounded text-sm">Brand voice saved.</div>
       )}
       {params.brand === 'error' && (
-        <div className="mb-4 p-3 bg-red-100 text-red-700 rounded text-sm">Error with brand voice action.</div>
+        <div className="mb-4 p-3 bg-red-100 text-red-700 rounded text-sm">
+          Error with brand voice action.
+          {params.message && <> Details: {params.message}</>}
+        </div>
       )}
       {params.knowledge === 'success' && (
         <div className="mb-4 p-3 bg-green-100 text-green-700 rounded text-sm">Knowledge ingested successfully.</div>
       )}
       {params.knowledge === 'error' && (
-        <div className="mb-4 p-3 bg-red-100 text-red-700 rounded text-sm">Error ingesting knowledge.</div>
+        <div className="mb-4 p-3 bg-red-100 text-red-700 rounded text-sm">
+          Error ingesting knowledge.
+          {params.message && <> Details: {params.message}</>}
+        </div>
       )}
       {params.autonomy === 'saved' && (
         <div className="mb-4 p-3 bg-green-100 text-green-700 rounded text-sm">Autonomy saved.</div>
@@ -352,13 +389,19 @@ export default async function Settings({ searchParams }: { searchParams?: Promis
         </div>
       )}
       {params.placement === 'error' && (
-        <div className="mb-4 p-3 bg-red-100 text-red-700 rounded text-sm">Error generating placement suggestion (check store token).</div>
+        <div className="mb-4 p-3 bg-red-100 text-red-700 rounded text-sm">
+          Error generating placement suggestion (check store token).
+          {params.message && <> Details: {params.message}</>}
+        </div>
       )}
       {params.metafields === 'refreshed' && (
         <div className="mb-4 p-3 bg-green-100 text-green-700 rounded text-sm">Metafield schema and values refreshed (full store now in knowledge + config).</div>
       )}
       {params.metafields === 'error' && (
-        <div className="mb-4 p-3 bg-red-100 text-red-700 rounded text-sm">Error refreshing metafield schema (check store token/permissions).</div>
+        <div className="mb-4 p-3 bg-red-100 text-red-700 rounded text-sm">
+          Error refreshing metafield schema (check store token/permissions).
+          {params.message && <> Details: {params.message}</>}
+        </div>
       )}
       {params.products === 'synced' && (
         <div className="mb-4 p-3 bg-green-100 text-green-700 rounded text-sm">Products synced successfully ({params.count || '0'} imported: titles, descriptions, handles, images, metafields).</div>

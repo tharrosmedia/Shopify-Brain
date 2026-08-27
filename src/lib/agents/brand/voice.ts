@@ -31,7 +31,8 @@ export async function inferBrandVoice({ storeId }: { storeId: string }) {
   let mfSamples: any = null;
   try {
     mfSamples = await fetchMetafieldValueSamples(client);
-    await writeKnowledge(storeId, `Full store metafield schema and current values: ${JSON.stringify(mfSamples)}`, {
+    const schemaStr = JSON.stringify(mfSamples).slice(0, 8000);
+    await writeKnowledge(storeId, `Full store metafield schema and current values: ${schemaStr}`, {
       type: 'metafield_schema_full',
       source: 'brand_inference',
     });

@@ -11,7 +11,7 @@ export async function fetchStoreSamples(adminClient: any, limit = 5) {
       if (shop.name) samples.push({ title: 'Shop Name', body: shop.name });
       if (shop.description) samples.push({ title: 'Shop Description', body: shop.description });
     }
-  } catch {}
+  } catch (e) { console.warn('[shopify content] fetch failed:', e); }
 
   try {
     const prodQ = `
@@ -28,7 +28,7 @@ export async function fetchStoreSamples(adminClient: any, limit = 5) {
       if (n.title) samples.push({ title: n.title, body: (n.descriptionHtml || '').slice(0, 500) });
       if (n.productType) samples.push({ title: `${n.title} Type`, body: n.productType });
     });
-  } catch {}
+  } catch (e) { console.warn('[shopify content] fetch failed:', e); }
 
   try {
     const collQ = `
@@ -44,7 +44,7 @@ export async function fetchStoreSamples(adminClient: any, limit = 5) {
       const n = e.node;
       if (n.title) samples.push({ title: n.title, body: (n.descriptionHtml || '').slice(0, 500) });
     });
-  } catch {}
+  } catch (e) { console.warn('[shopify content] fetch failed:', e); }
 
   try {
     const pageQ = `
@@ -60,7 +60,7 @@ export async function fetchStoreSamples(adminClient: any, limit = 5) {
       const n = e.node;
       if (n.title) samples.push({ title: n.title, body: (n.body || '').slice(0, 800) });
     });
-  } catch {}
+  } catch (e) { console.warn('[shopify content] fetch failed:', e); }
 
   try {
     const blog = await getFirstBlog(adminClient);
@@ -79,7 +79,7 @@ export async function fetchStoreSamples(adminClient: any, limit = 5) {
       const n = e.node;
       if (n.title) samples.push({ title: n.title, body: (n.bodyHtml || '').slice(0, 500) });
     });
-  } catch {}
+  } catch (e) { console.warn('[shopify content] fetch failed:', e); }
 
   return samples.slice(0, 15);
 }
@@ -125,7 +125,7 @@ export async function fetchMetafieldDefinitions(adminClient: any) {
       edges.forEach((e: any) => {
         defs.push({ ...e.node, ownerType: ot });
       });
-    } catch {}
+    } catch (e) { console.warn('[shopify content] fetch failed:', e); }
   }
   return defs;
 }
@@ -167,7 +167,7 @@ export async function fetchMetafieldValueSamples(adminClient: any) {
       const mfs = (e.node.metafields?.edges || []).map((me: any) => me.node);
       if (mfs.length) result.COLLECTION.examples.push({ title: e.node.title, metafields: mfs });
     });
-  } catch {}
+  } catch (e) { console.warn('[shopify content] fetch failed:', e); }
 
   try {
     // Products
@@ -190,7 +190,7 @@ export async function fetchMetafieldValueSamples(adminClient: any) {
       const mfs = (e.node.metafields?.edges || []).map((me: any) => me.node);
       if (mfs.length) result.PRODUCT.examples.push({ title: e.node.title, metafields: mfs });
     });
-  } catch {}
+  } catch (e) { console.warn('[shopify content] fetch failed:', e); }
 
   try {
     // Shop level
@@ -210,7 +210,7 @@ export async function fetchMetafieldValueSamples(adminClient: any) {
       const mfs = shop.metafields.edges.map((me: any) => me.node);
       result.SHOP.examples.push({ title: shop.name || 'Shop', metafields: mfs });
     }
-  } catch {}
+  } catch (e) { console.warn('[shopify content] fetch failed:', e); }
 
   try {
     // Pages
@@ -233,7 +233,7 @@ export async function fetchMetafieldValueSamples(adminClient: any) {
       const mfs = (e.node.metafields?.edges || []).map((me: any) => me.node);
       if (mfs.length) result.PAGE.examples.push({ title: e.node.title, metafields: mfs });
     });
-  } catch {}
+  } catch (e) { console.warn('[shopify content] fetch failed:', e); }
 
   try {
     // Articles (blog)
@@ -259,7 +259,7 @@ export async function fetchMetafieldValueSamples(adminClient: any) {
       const mfs = (e.node.metafields?.edges || []).map((me: any) => me.node);
       if (mfs.length) result.ARTICLE.examples.push({ title: e.node.title, metafields: mfs });
     });
-  } catch {}
+  } catch (e) { console.warn('[shopify content] fetch failed:', e); }
 
   return result;
 }

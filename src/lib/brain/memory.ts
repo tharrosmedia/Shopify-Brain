@@ -42,6 +42,10 @@ export async function retrieve(storeId: string, query: string, limit: number = 5
 
 export async function writeKnowledge(storeId: string, content: string, metadata: Record<string, unknown> = {}): Promise<void> {
   if (!content || !storeId) return;
+  if (content.length > 10000) {
+    console.warn('writeKnowledge: truncating very long content', content.length);
+    content = content.slice(0, 10000);
+  }
   const sql = neon(process.env.DATABASE_URL!);
   const normalized = content.trim().toLowerCase();
   // Dedup: exact normalized content match per store (best simple + effective)

@@ -16,8 +16,9 @@ export async function getStore(id: string) {
     try {
       row.shopify_access_token = decrypt(row.shopify_access_token, process.env.ENCRYPTION_KEY!);
     } catch (e) {
-      // If decryption fails (e.g. old plaintext or bad key), keep as-is or throw in prod
+      // If decryption fails (e.g. old plaintext or bad key), clear it so callers get clear "no token" errors
       console.warn('Failed to decrypt token for store', id, '— may be plaintext or wrong key');
+      row.shopify_access_token = '';
     }
   }
   return row;
