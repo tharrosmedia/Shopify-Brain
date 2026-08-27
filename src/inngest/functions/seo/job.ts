@@ -24,12 +24,13 @@ import { listProducts, searchProducts } from '../../../lib/db/products';
 export const seoJob = inngest.createFunction(
   { id: 'seo-job', retries: 2, triggers: [{ event: 'seo/job.requested' }] },
   async ({ event, step }: any) => {
-    const data = event.data as { storeId: string; keyword: string; jobId?: string; job_id?: string; type?: string; platform?: string; brandVoice?: any };
+    const data = event.data as { storeId: string; keyword: string; jobId?: string; job_id?: string; type?: string; platform?: string; brandVoice?: any; seoRules?: any };
     const storeId = data.storeId;
     const keyword = data.keyword;
     const type = data.type || 'collection';
     const platform = data.platform || 'shopify';
     const brandVoice = data.brandVoice;
+    const providedSeoRules = data.seoRules;
     const providedJobId = data.jobId || data.job_id;
     const jobId = providedJobId || 'unknown';
 
@@ -87,10 +88,14 @@ export const seoJob = inngest.createFunction(
     let placement: any = {};
     let metafieldDefinitions: any[] = []; // relevant slice for this job
     let products: any[] = [];
+    let seoRules: any = providedSeoRules;
     try {
       const store = await getStore(storeId);
       if (store?.config?.placement) {
         placement = store.config.placement || {};
+      }
+      if (!seoRules && store?.config?.seoRules) {
+        seoRules = store.config.seoRules;
       }
       if (store && store.shopify_access_token) {
         const client = createAdminClient(store.shopify_domain, store.shopify_access_token);
@@ -144,7 +149,7 @@ export const seoJob = inngest.createFunction(
       try {
         researchResult = await step.invoke('research', {
           function: researchFn,
-          data: { storeId, keyword, type, platform, brandVoice, metafieldDefinitions, placement, products },
+          data: { storeId, keyword, type, platform, brandVoice, seoRules, metafieldDefinitions, placement, products },
         });
       } catch (err: any) {
         await step.invoke('log-research-fail', {
@@ -157,7 +162,7 @@ export const seoJob = inngest.createFunction(
       try {
         brief = await step.invoke('create-brief', {
           function: createBriefFn,
-          data: { storeId, keyword, research: researchResult, type, platform, brandVoice, metafieldDefinitions, placement, products },
+          data: { storeId, keyword, research: researchResult, type, platform, brandVoice, seoRules, metafieldDefinitions, placement, products },
         });
       } catch (err: any) {
         await step.invoke('log-brief-fail', {
@@ -170,7 +175,7 @@ export const seoJob = inngest.createFunction(
       try {
         draft = await step.invoke('write', {
           function: writeDraftFn,
-          data: { storeId, brief, type, platform, brandVoice, metafieldDefinitions, placement, products },
+          data: { storeId, brief, type, platform, brandVoice, seoRules, metafieldDefinitions, placement, products },
         });
       } catch (err: any) {
         await step.invoke('log-write-fail', {
@@ -182,27 +187,31 @@ export const seoJob = inngest.createFunction(
 
       edited = await step.invoke('edit', {
         function: editDraftFn,
-        data: { storeId, draft, type, platform, brandVoice, metafieldDefinitions, placement, products },
+        data: { storeId, draft, type, platform, brandVoice, seoRules, metafieldDefinitions, placement, products },
       });
 
       optimized = await step.invoke('optimize', {
         function: optimizeDraftFn,
-        data: { storeId, draft: edited, type, platform, brandVoice, metafieldDefinitions, placement, products },
+        data: { storeId, draft: edited, type, platform, brandVoice, seoRules, metafieldDefinitions, placement, products },
       });
 
       // Internal grader-driven iteration (strictly internal helpers, no standalone event triggers).
-      // rewrite until >= 8.5/10 or max 8 iterations.
-      // Grader provides feedback; revise can change ANY fields (title, handle, metas, body, metafields...).
-      // Brief + research passed so intent is used for SERP-adaptive titles etc.
+      // Use structured seoRules for all agents. Keep single highest-scoring draft.
+      // Only accept revise if score strictly improves. Stop early on no gain.
       let current = optimized;
       scores = await step.invoke('grade', {
         function: gradeDraftFn,
-        data: { draft: current, type, platform, brandVoice, metafieldDefinitions, placement, products, brief, research: researchResult },
+        data: { draft: current, type, platform, brandVoice, seoRules, metafieldDefinitions, placement, products, brief, research: researchResult },
       });
+
+      let best = current;
+      let bestScore = scores?.score ?? 0;
+      let bestFeedback = scores;
 
       let iterations = 0;
       const MAX_ITER = 8;
-      while (iterations < MAX_ITER && (scores?.score ?? 0) < 8.5) {
+      let itersSinceImprovement = 0;
+      while (iterations < MAX_ITER && bestScore < 8.5) {
         iterations += 1;
         await step.invoke('log-iteration', {
           function: logEventFn,
@@ -211,22 +220,33 @@ export const seoJob = inngest.createFunction(
 
         current = await step.invoke('revise', {
           function: reviseDraftFn,
-          data: { draft: current, feedback: scores, type, platform, brandVoice, metafieldDefinitions, placement, products, brief, research: researchResult },
+          data: { draft: current, feedback: scores, type, platform, brandVoice, seoRules, metafieldDefinitions, placement, products, brief, research: researchResult },
         });
 
         // Re-optimize meta/schema after revision
         current = await step.invoke('optimize', {
           function: optimizeDraftFn,
-          data: { storeId, draft: current, type, platform, brandVoice, metafieldDefinitions, placement, products },
+          data: { storeId, draft: current, type, platform, brandVoice, seoRules, metafieldDefinitions, placement, products },
         });
 
         scores = await step.invoke('grade', {
           function: gradeDraftFn,
-          data: { draft: current, type, platform, brandVoice, metafieldDefinitions, placement, products, brief, research: researchResult },
+          data: { draft: current, type, platform, brandVoice, seoRules, metafieldDefinitions, placement, products, brief, research: researchResult },
         });
+
+        if ((scores?.score ?? 0) > bestScore) {
+          best = current;
+          bestScore = scores.score;
+          bestFeedback = scores;
+          itersSinceImprovement = 0;
+        } else {
+          itersSinceImprovement++;
+          if (itersSinceImprovement >= 2) break; // stop early on no gain
+        }
       }
 
-      optimized = current;
+      optimized = best;
+      scores = bestFeedback;
 
       draftRecord = await step.invoke('save-draft', {
         function: saveDraftFn,

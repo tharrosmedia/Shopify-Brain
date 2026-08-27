@@ -22,10 +22,11 @@ async function requeueJob(formData: FormData) {
     const current = stores.find((s: any) => s.id === storeId) || stores[0];
     const platform = current?.platform || 'shopify';
     const brandVoice = current?.config?.brandVoice;
+    const seoRules = current?.config?.seoRules;
     console.log('[INNGEST] re-sending seo/job.requested', { jobId, type, hasEventKey: !!process.env.INNGEST_EVENT_KEY });
     await inngest.send({
       name: 'seo/job.requested',
-      data: { storeId, keyword, type, platform, brandVoice, jobId },
+      data: { storeId, keyword, type, platform, brandVoice, seoRules, jobId },
     });
     console.log('[INNGEST] re-send completed for', jobId);
     const { revalidatePath } = await import('next/cache');

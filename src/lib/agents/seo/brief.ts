@@ -8,7 +8,7 @@ const BriefSchema = z.object({
   researchSummary: z.string(),
 });
 
-export async function createBrief({ storeId, keyword, research, type = 'collection', platform, brandVoice, metafieldDefinitions, placement, products = [] }: { storeId: string; keyword: string; research: any; type?: string; platform?: string; brandVoice?: any; metafieldDefinitions?: any[]; placement?: any; products?: any[] }) {
+export async function createBrief({ storeId, keyword, research, type = 'collection', platform, brandVoice, seoRules, metafieldDefinitions, placement, products = [] }: { storeId: string; keyword: string; research: any; type?: string; platform?: string; brandVoice?: any; seoRules?: any; metafieldDefinitions?: any[]; placement?: any; products?: any[] }) {
   const bv = brandVoice ? (typeof brandVoice === 'string' ? brandVoice : brandVoice.text || '') : '';
   const researchSum = research?.summary || '';
   const defsStr = (metafieldDefinitions && metafieldDefinitions.length) ? JSON.stringify(metafieldDefinitions.map((d: any) => ({ namespace: d.namespace, key: d.key, name: d.name, type: d.type?.name }))) : 'none';

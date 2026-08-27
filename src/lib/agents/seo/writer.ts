@@ -1,8 +1,9 @@
 import { generateObject } from 'ai';
 import { z } from 'zod';
 import { xai, XAI_MODEL } from '../../ai/xai';
+import { formatSEORulesForPrompt } from '../../seo/rules';
 
-export async function writeDraft({ storeId, brief, type = 'collection', platform, brandVoice, metafieldDefinitions, placement, products = [] }: { storeId: string; brief: any; type?: string; platform?: string; brandVoice?: any; metafieldDefinitions?: any[]; placement?: any; products?: any[] }) {
+export async function writeDraft({ storeId, brief, type = 'collection', platform, brandVoice, seoRules, metafieldDefinitions, placement, products = [] }: { storeId: string; brief: any; type?: string; platform?: string; brandVoice?: any; seoRules?: any; metafieldDefinitions?: any[]; placement?: any; products?: any[] }) {
   const bv = brandVoice ? (typeof brandVoice === 'string' ? brandVoice : brandVoice.text || '') : '';
   const bvPart = bv ? ` Follow this brand voice: ${bv}.` : '';
   const plat = platform || brief.platform || '';
@@ -14,8 +15,11 @@ export async function writeDraft({ storeId, brief, type = 'collection', platform
 
   const placementStr = placement ? JSON.stringify(placement) : 'default';
   const productsStr = products.length ? JSON.stringify(products.slice(0, 8).map((p: any) => ({ title: p.title, handle: p.handle, desc: (p.descriptionHtml || '').slice(0, 100) }))) : 'none';
+  const rulesText = formatSEORulesForPrompt(seoRules);
 
   const prompt = `Create high-quality SEO content for a ${p}${type} about keyword "${brief.keyword}".${bvPart}
+STRICTLY follow these SEO rules:
+${rulesText}
 Primary goal: best SEO for this exact keyword and job.
 Store placement: ${placementStr}
 Available products (use for recommendations, include in collection, link in content): ${productsStr}

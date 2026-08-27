@@ -1,3 +1,5 @@
+import type { SEORule } from '../seo/rules';
+
 export interface MetafieldTarget {
   namespace: string;
   key: string;
@@ -42,6 +44,7 @@ export interface StoreConfig {
   };
   productsLastSynced?: string;
   productsSyncedCount?: number;
+  seoRules?: SEORule[];
 }
 
 export interface Store {

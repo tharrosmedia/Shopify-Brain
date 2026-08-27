@@ -4,9 +4,9 @@ import { optimizeDraft } from '../../../lib/agents/seo/optimizer';
 export const optimizeDraftFn = inngest.createFunction(
   { id: 'seo-optimize-draft', retries: 2, triggers: [{ event: 'seo/optimize-draft' }] },
   async ({ event, step }: any) => {
-    const { storeId, draft, type = 'collection', platform, brandVoice, metafieldDefinitions, placement, products } = event.data;
+    const { storeId, draft, type = 'collection', platform, brandVoice, seoRules, metafieldDefinitions, placement, products } = event.data;
     return await step.run('optimize-draft', async () => {
-      return optimizeDraft({ storeId, draft, type, platform, brandVoice, metafieldDefinitions, placement, products });
+      return optimizeDraft({ storeId, draft, type, platform, brandVoice, seoRules, metafieldDefinitions, placement, products });
     });
   }
 );

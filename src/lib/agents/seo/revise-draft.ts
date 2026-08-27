@@ -1,6 +1,7 @@
 import { generateObject } from 'ai';
 import { xai, XAI_MODEL } from '../../ai/xai';
 import { z } from 'zod';
+import { formatSEORulesForPrompt } from '../../seo/rules';
 
 const ReviseSchema = z.object({
   title: z.string(),
@@ -18,6 +19,7 @@ export async function reviseDraft({
   type = 'collection',
   platform,
   brandVoice,
+  seoRules,
   metafieldDefinitions = [],
   placement,
   products = [],
@@ -29,6 +31,7 @@ export async function reviseDraft({
   type?: string;
   platform?: string;
   brandVoice?: any;
+  seoRules?: any;
   metafieldDefinitions?: any[];
   placement?: any;
   products?: any[];
@@ -54,8 +57,12 @@ export async function reviseDraft({
   const productsStr = products.length ? JSON.stringify(products.slice(0, 8).map((p: any) => ({ title: p.title, handle: p.handle, desc: (p.descriptionHtml || '').slice(0, 80) }))) : 'none';
 
   const fb = typeof feedback === 'string' ? feedback : JSON.stringify(feedback || {});
+  const rulesText = formatSEORulesForPrompt(seoRules);
 
-  const prompt = `You are an expert SEO reviser. The current draft scored below target on the grader. Use the grader feedback to produce a significantly better version.
+  const prompt = `You are an expert SEO reviser. The current draft scored below target on the grader. Use the grader feedback (including any rule violations) to produce a significantly better version. STRICTLY adhere to the SEO rules.
+
+SEO RULES:
+${rulesText}
 
 Searcher intent: ${intent}
 Research angles: ${researchSum}
@@ -63,7 +70,7 @@ Brand voice: ${bv}
 Type: ${type}
 Placement: ${placement ? JSON.stringify(placement) : 'default'}
 
-Grader feedback (use this to drive changes):
+Grader feedback (use this to drive changes; address violations by ruleId):
 ${fb}
 
 Current draft:
@@ -77,11 +84,7 @@ ${productsStr}
 
 Rules:
 - You MAY change title, handle, metaTitle, metaDescription, bodyHtml, metafields, schema as needed.
-- Make metaTitle stand out in SERPs: adaptive, intent-focused, benefit/curiosity/specific, natural keyword, ~50-60 chars.
-- metaDescription: directly solves the intent, benefit-oriented, non-repetitive, compelling, ~155 chars.
-- Body: clean HTML (h2/h3, ul, short paragraphs). Avoid repetition. Move structured info to appropriate metafields when defs allow.
-- Use products and metafields where they improve SEO and user value.
-- Match brand voice.
+- Address all rule violations from grader feedback.
 - Do not duplicate content between body and metas.
 
 Return the complete improved structured draft.`;

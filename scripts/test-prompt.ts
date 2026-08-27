@@ -50,14 +50,14 @@ async function run() {
     }
   } else if (cmd === 'writer') {
     const sampleBrief = { keyword, type, platform, brandVoice, intent: 'commercial', sections: ['intro', 'specs'], researchSummary: 'Sample research for ' + keyword };
-    const allMsgs = buildWriterMessages({ brief: sampleBrief, type, brandVoice, platform });
+    const allMsgs = buildWriterMessages({ brief: sampleBrief, type, brandVoice, platform, seoRules: undefined });
     if (isDry) {
       console.log('DRY writer messages:', JSON.stringify(allMsgs, null, 2));
       return;
     }
     if (isReal) {
       console.log('Running real writeDraft...');
-      const result = await writeDraft({ storeId, brief: sampleBrief, type, platform, brandVoice });
+      const result = await writeDraft({ storeId, brief: sampleBrief, type, platform, brandVoice, seoRules: undefined });
       console.dir(result, { depth: 1 });
     } else {
       console.log('Running isolated writer prompt...');

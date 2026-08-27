@@ -3,7 +3,7 @@ import { xai, XAI_MODEL } from '../../ai/xai';
 import { buildResearchMessages } from '../../prompts/seo/research';
 import { retrieve, writeKnowledge } from '../../brain/memory';
 
-export async function research({ storeId, keyword, type = 'collection', platform, brandVoice, metafieldDefinitions, placement, products = [] }: { storeId: string; keyword: string; type?: string; platform?: string; brandVoice?: any; metafieldDefinitions?: any[]; placement?: any; products?: any[] }) {
+export async function research({ storeId, keyword, type = 'collection', platform, brandVoice, seoRules, metafieldDefinitions, placement, products = [] }: { storeId: string; keyword: string; type?: string; platform?: string; brandVoice?: any; seoRules?: any; metafieldDefinitions?: any[]; placement?: any; products?: any[] }) {
   const tavilyRes = await fetch('https://api.tavily.com/search', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

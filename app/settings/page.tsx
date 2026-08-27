@@ -8,6 +8,7 @@ import { createAdminClient } from '@/src/lib/shopify/client';
 import { fetchStoreSamples, fetchMetafieldDefinitions, fetchMetafieldValueSamples } from '@/src/lib/shopify/content';
 import { syncProductsForStore } from '@/src/lib/shopify/sync';
 import { listProducts } from '@/src/lib/db/products';
+import { getDefaultSEORules } from '@/src/lib/seo/rules';
 
 async function resyncInngest() {
   'use server';
@@ -159,6 +160,62 @@ async function saveBrandVoiceAction(formData: FormData) {
   });
   revalidatePath('/settings');
   redirect('/settings?brand=saved');
+}
+
+async function saveSEORulesAction(formData: FormData) {
+  'use server';
+  const { revalidatePath } = await import('next/cache');
+  const { redirect } = await import('next/navigation');
+  const rulesStr = formData.get('seoRulesJson') as string || '';
+  const store = await getActiveStore();
+  if (!store) {
+    revalidatePath('/settings');
+    redirect('/settings?seoRules=error');
+    return;
+  }
+  let parsed: any = null;
+  try {
+    parsed = rulesStr ? JSON.parse(rulesStr) : getDefaultSEORules();
+    if (!Array.isArray(parsed)) throw new Error('seoRules must be an array');
+  } catch (e: any) {
+    revalidatePath('/settings');
+    redirect('/settings?seoRules=error&message=' + encodeURIComponent('Invalid JSON: ' + (e?.message || '')));
+    return;
+  }
+  const currentConfig = store.config || {};
+  const newConfig = { ...currentConfig, seoRules: parsed };
+  await updateStore(store.id, {
+    name: store.name,
+    shopify_domain: store.shopify_domain,
+    shopify_access_token: '',
+    platform: store.platform || 'shopify',
+    config: newConfig,
+  });
+  revalidatePath('/settings');
+  redirect('/settings?seoRules=saved');
+}
+
+async function resetSEORulesAction() {
+  'use server';
+  const { revalidatePath } = await import('next/cache');
+  const { redirect } = await import('next/navigation');
+  const store = await getActiveStore();
+  if (!store) {
+    revalidatePath('/settings');
+    redirect('/settings?seoRules=error');
+    return;
+  }
+  const currentConfig = store.config || {};
+  const newConfig = { ...currentConfig, seoRules: getDefaultSEORules() };
+  await updateStore(store.id, {
+    name: store.name,
+    shopify_domain: store.shopify_domain,
+    shopify_access_token: '',
+    platform: store.platform || 'shopify',
+    config: newConfig,
+  });
+  revalidatePath('/settings');
+  redirect('/settings?seoRules=reset');
 }
 
 async function saveAutonomyAction(formData: FormData) {
@@ -328,8 +385,8 @@ async function syncProductsAction() {
 
 export const dynamic = 'force-dynamic';
 
-export default async function Settings({ searchParams }: { searchParams?: Promise<{ resync?: string; brand?: string; autonomy?: string; knowledge?: string; url?: string; status?: string; message?: string; placement?: string; placementReason?: string; metafields?: string; products?: string; count?: string }> }) {
-  const params = await (searchParams || Promise.resolve({})) as { resync?: string; brand?: string; autonomy?: string; knowledge?: string; url?: string; status?: string; message?: string; placement?: string; placementReason?: string; metafields?: string; products?: string; count?: string };
+export default async function Settings({ searchParams }: { searchParams?: Promise<{ resync?: string; brand?: string; autonomy?: string; knowledge?: string; url?: string; status?: string; message?: string; placement?: string; placementReason?: string; metafields?: string; products?: string; count?: string; seoRules?: string }> }) {
+  const params = await (searchParams || Promise.resolve({})) as { resync?: string; brand?: string; autonomy?: string; knowledge?: string; url?: string; status?: string; message?: string; placement?: string; placementReason?: string; metafields?: string; products?: string; count?: string; seoRules?: string };
   const store = await getActiveStore();
   const config = store?.config || {};
   const bv = config.brandVoice || null;
@@ -411,6 +468,17 @@ export default async function Settings({ searchParams }: { searchParams?: Promis
           Error syncing products: {params.message ? decodeURIComponent(params.message) : 'check that the Admin API token has read_products scope (and regenerate the token in Shopify after adding scopes).'}
         </div>
       )}
+      {params.seoRules === 'saved' && (
+        <div className="mb-4 p-3 bg-green-100 text-green-700 rounded text-sm">SEO Rules saved. Will be used for future jobs (writer, optimize, grade, revise).</div>
+      )}
+      {params.seoRules === 'reset' && (
+        <div className="mb-4 p-3 bg-green-100 text-green-700 rounded text-sm">SEO Rules reset to initial defaults.</div>
+      )}
+      {params.seoRules === 'error' && (
+        <div className="mb-4 p-3 bg-red-100 text-red-700 rounded text-sm">
+          Error saving SEO Rules. {params.message ? decodeURIComponent(params.message) : ''}
+        </div>
+      )}
 
       <div className="mb-8 border p-4 rounded">
         <h2 className="font-semibold mb-4">Inngest Sync</h2>
@@ -430,6 +498,7 @@ export default async function Settings({ searchParams }: { searchParams?: Promis
             <div>Metafields: {config.metafieldSchema?.lastRefreshed ? `Refreshed ${new Date(config.metafieldSchema.lastRefreshed).toLocaleDateString()} (${config.metafieldSchema.definitions?.length || 0} fields)` : 'Not loaded (use Refresh button)'}</div>
             <div>Products: {config.productsLastSynced ? `Synced ${new Date(config.productsLastSynced).toLocaleDateString()} (${config.productsSyncedCount || 0} products)` : 'Not synced (use button below)'}</div>
             <div>Brand Voice: {bv ? 'Set' : 'Not set'}{bv && bv.inferredAt ? ` (inferred ${new Date(bv.inferredAt).toLocaleDateString()})` : ''}</div>
+            <div>SEO Rules: {config.seoRules && Array.isArray(config.seoRules) ? `${config.seoRules.length} rules` : 'Using defaults'}</div>
             <div>Autonomy: {auto ? 'Set' : 'Defaults (all types, require approval)'}</div>
           </div>
          ) : <div>No active store.</div>}
@@ -468,6 +537,18 @@ export default async function Settings({ searchParams }: { searchParams?: Promis
           <Button type="submit">Save Brand Voice</Button>
         </form>
         {bv && <div className="mt-2 text-xs text-muted-foreground">Last updated: {bv.inferredAt ? new Date(bv.inferredAt).toLocaleString() : 'manual'} | Samples used: {bv.samplesUsed || 'n/a'}</div>}
+      </div>
+
+      <div className="mb-8 border p-4 rounded">
+        <h2 className="font-semibold mb-4">SEO Rules (Structured - per store)</h2>
+        <p className="text-xs text-muted-foreground mb-2">These rules are injected into writer, optimizer, grader and reviser. Edit the JSON array to customize. Changes affect new jobs.</p>
+        <form action={resetSEORulesAction} className="mb-2">
+          <Button type="submit" variant="outline">Reset to Initial Defaults</Button>
+        </form>
+        <form action={saveSEORulesAction} className="space-y-2">
+          <textarea name="seoRulesJson" defaultValue={JSON.stringify(config.seoRules || getDefaultSEORules(), null, 2)} className="border p-2 w-full h-48 font-mono text-xs" placeholder="JSON array of {id, category, rule}" />
+          <Button type="submit">Save SEO Rules</Button>
+        </form>
       </div>
 
       <div className="mb-8 border p-4 rounded">

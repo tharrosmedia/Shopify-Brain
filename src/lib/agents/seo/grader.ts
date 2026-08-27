@@ -1,10 +1,12 @@
 import { generateObject } from 'ai';
 import { xai, XAI_MODEL } from '../../ai/xai';
 import { z } from 'zod';
+import { formatSEORulesForPrompt, getDefaultSEORules } from '../../seo/rules';
 
 const GradeSchema = z.object({
   score: z.number().min(0).max(10),
   suggestions: z.array(z.string()).optional(),
+  violations: z.array(z.object({ ruleId: z.string(), note: z.string() })).optional(),
   titleFeedback: z.string().optional(),
   metaDescriptionFeedback: z.string().optional(),
   contentFeedback: z.string().optional(),
@@ -17,6 +19,7 @@ export async function gradeDraft({
   type = 'collection',
   platform,
   brandVoice,
+  seoRules,
   metafieldDefinitions = [],
   placement,
   products = [],
@@ -27,6 +30,7 @@ export async function gradeDraft({
   type?: string;
   platform?: string;
   brandVoice?: any;
+  seoRules?: any;
   metafieldDefinitions?: any[];
   placement?: any;
   products?: any[];
@@ -44,8 +48,12 @@ export async function gradeDraft({
     ? JSON.stringify(metafieldDefinitions.map((d: any) => ({ namespace: d.namespace, key: d.key, name: d.name, type: d.type?.name, description: d.description })))
     : 'none';
   const prods = products.length ? products.slice(0, 6).map((p: any) => `${p.title} (/${p.handle})`).join('; ') : 'none';
+  const rulesText = formatSEORulesForPrompt(seoRules);
 
-  const prompt = `You are an expert SEO grader and editor coach. Grade this ${type} draft on a 0-10 scale (8.5+ is required before human approval).
+  const prompt = `You are an expert SEO grader and editor coach. Grade this ${type} draft on a 0-10 scale (8.5+ is required before human approval). Use the structured SEO rules below as the STRICT rubric.
+
+SEO RULES:
+${rulesText}
 
 Searcher intent: ${intent}
 Research summary: ${researchSum}
@@ -62,15 +70,8 @@ metafields used: ${mfs}
 Available metafield defs: ${defsStr}
 Available products for this job: ${prods}
 
-Evaluation criteria (be strict):
-- metaTitle: Does it stand out in SERPs for the exact intent? Attention-grabbing, benefit/specificity/curiosity oriented, primary keyword natural, not lazy like just the keyword or "Keyword | Options". Adaptive to competition.
-- metaDescription: Addresses searcher intent directly, unique value, benefit-focused, ~150-160 chars, no repetition of body or keyword stuffing, compelling.
-- Content quality: Clean structure (headings, lists), no walls of repetitive text, flows well, uses products naturally, helpful for user.
-- Metafield utilization: When relevant COLLECTION/PAGE defs exist (e.g. FAQ fields), are they populated with distinct useful values instead of dumping everything in body?
-- Product integration: Real products from context are referenced or recommended where it makes sense (for collections especially).
-- Overall SEO, brand voice match, usefulness.
-
-Return score (0-10), 3-8 specific actionable suggestions, plus short feedback strings for title, metaDescription, content, metafields, products.`;
+Be strict. For every rule violated, include {ruleId, note} in violations array.
+Return score (0-10), 3-8 specific actionable suggestions (reference ruleIds), violations array, plus short feedback strings for title, metaDescription, content, metafields, products.`;
 
   try {
     const { object } = await generateObject({
@@ -90,6 +91,7 @@ Return score (0-10), 3-8 specific actionable suggestions, plus short feedback st
     return {
       score: Math.min(7, Math.max(4, score)),
       suggestions: ['Improve metaTitle to speak directly to searcher intent and stand out', 'Populate relevant metafields (FAQs etc.) instead of long body text', 'Reference specific products from context'],
+      violations: [],
       titleFeedback: hasMetaT ? 'Basic title present' : 'Lazy or missing title',
       metaDescriptionFeedback: hasMetaD ? 'Basic description' : 'Too short or generic',
       contentFeedback: 'Review for repetition and structure',

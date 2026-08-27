@@ -6,9 +6,9 @@ export const gradeDraftFn = inngest.createFunction(
   // as part of the grader-driven revision loop. Do not trigger directly.
   { id: 'seo-grade-draft', retries: 2 },
   async ({ event, step }: any) => {
-    const { draft, type = 'collection', platform, brandVoice, metafieldDefinitions, placement, products, brief, research } = event.data;
+    const { draft, type = 'collection', platform, brandVoice, seoRules, metafieldDefinitions, placement, products, brief, research } = event.data;
     return await step.run('grade-draft', async () => {
-      return gradeDraft({ draft, type, platform, brandVoice, metafieldDefinitions, placement, products, brief, research });
+      return gradeDraft({ draft, type, platform, brandVoice, seoRules, metafieldDefinitions, placement, products, brief, research });
     });
   }
 );

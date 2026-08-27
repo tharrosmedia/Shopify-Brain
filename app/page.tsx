@@ -21,6 +21,7 @@ async function triggerJob(formData: FormData) {
   const current = stores.find((s: any) => s.id === storeId) || stores[0];
   const platform = current?.platform || 'shopify';
   const brandVoice = current?.config?.brandVoice;
+  const seoRules = current?.config?.seoRules;
   const autonomy = current?.config?.autonomy;
   if (autonomy?.allowedTypes && !autonomy.allowedTypes.includes(type)) {
     throw new Error(`Type ${type} not allowed for this store per autonomy config`);
@@ -33,12 +34,12 @@ async function triggerJob(formData: FormData) {
       sameSite: 'lax',
     });
   }
-  const job = await createJob({ storeId, domain: 'seo', type, input: { keyword, platform, brandVoice }, status: 'queued' });
+  const job = await createJob({ storeId, domain: 'seo', type, input: { keyword, platform, brandVoice, seoRules }, status: 'queued' });
   console.log('[INNGEST] sending seo/job.requested', { jobId: job.id, type, hasEventKey: !!process.env.INNGEST_EVENT_KEY });
   try {
     await inngest.send({
       name: 'seo/job.requested',
-      data: { storeId, keyword, type, platform, brandVoice, jobId: job.id },
+      data: { storeId, keyword, type, platform, brandVoice, seoRules, jobId: job.id },
     });
     console.log('[INNGEST] send completed without throw for', job.id);
   } catch (e: any) {
