@@ -9,6 +9,7 @@ import { fetchStoreSamples, fetchMetafieldDefinitions, fetchMetafieldValueSample
 import { syncProductsForStore } from '@/src/lib/shopify/sync';
 import { listProducts } from '@/src/lib/db/products';
 import { getDefaultSEORules } from '@/src/lib/seo/rules';
+import { SEORulesEditor } from '@/components/SEORulesEditor';
 
 async function resyncInngest() {
   'use server';
@@ -177,9 +178,16 @@ async function saveSEORulesAction(formData: FormData) {
   try {
     parsed = rulesStr ? JSON.parse(rulesStr) : getDefaultSEORules();
     if (!Array.isArray(parsed)) throw new Error('seoRules must be an array');
+    // Basic server validation
+    for (let i = 0; i < parsed.length; i++) {
+      const item = parsed[i];
+      if (!item || typeof item !== 'object' || !item.id || !item.rule || !item.category) {
+        throw new Error(`Rule ${i} missing required fields (id, category, rule)`);
+      }
+    }
   } catch (e: any) {
     revalidatePath('/settings');
-    redirect('/settings?seoRules=error&message=' + encodeURIComponent('Invalid JSON: ' + (e?.message || '')));
+    redirect('/settings?seoRules=error&message=' + encodeURIComponent('Invalid rules data: ' + (e?.message || '')));
     return;
   }
   const currentConfig = store.config || {};
@@ -541,12 +549,12 @@ export default async function Settings({ searchParams }: { searchParams?: Promis
 
       <div className="mb-8 border p-4 rounded">
         <h2 className="font-semibold mb-4">SEO Rules (Structured - per store)</h2>
-        <p className="text-xs text-muted-foreground mb-2">These rules are injected into writer, optimizer, grader and reviser. Edit the JSON array to customize. Changes affect new jobs.</p>
+        <p className="text-xs text-muted-foreground mb-2">These rules are injected into writer, optimizer, grader and reviser. Edit below. IDs are used in grader feedback. Changes affect new jobs.</p>
         <form action={resetSEORulesAction} className="mb-2">
           <Button type="submit" variant="outline">Reset to Initial Defaults</Button>
         </form>
         <form action={saveSEORulesAction} className="space-y-2">
-          <textarea name="seoRulesJson" defaultValue={JSON.stringify(config.seoRules || getDefaultSEORules(), null, 2)} className="border p-2 w-full h-48 font-mono text-xs" placeholder="JSON array of {id, category, rule}" />
+          <SEORulesEditor initialRules={config.seoRules || getDefaultSEORules()} />
           <Button type="submit">Save SEO Rules</Button>
         </form>
       </div>

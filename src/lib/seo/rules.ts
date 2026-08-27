@@ -1,6 +1,9 @@
+export const RULE_CATEGORIES = ['title', 'metaDescription', 'content', 'metafields', 'products', 'overall'] as const;
+export type RuleCategory = typeof RULE_CATEGORIES[number];
+
 export interface SEORule {
   id: string;
-  category: 'title' | 'metaDescription' | 'content' | 'metafields' | 'products' | 'overall';
+  category: RuleCategory;
   rule: string;
 }
 
