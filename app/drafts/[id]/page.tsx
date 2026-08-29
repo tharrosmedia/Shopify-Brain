@@ -25,6 +25,9 @@ async function decide(formData: FormData) {
     let schemaJsonLd = undefined;
     const sjStr = formData.get('schemaJsonLd') as string;
     if (sjStr) { try { schemaJsonLd = JSON.parse(sjStr); } catch {} }
+    let selectedProducts = undefined;
+    const spStr = formData.get('selectedProducts') as string;
+    if (spStr) { try { selectedProducts = JSON.parse(spStr); } catch {} }
     editedPayload = {
       title: formData.get('title'),
       handle: formData.get('handle'),
@@ -33,6 +36,7 @@ async function decide(formData: FormData) {
       metaDescription: formData.get('metaDescription'),
       metafields,
       schemaJsonLd,
+      selectedProducts,
     };
     await updateDraft(draftId, editedPayload);
   }
@@ -119,6 +123,17 @@ export default async function DraftDetail({ params }: { params: Promise<{ id: st
         <div>Meta Desc: {draft.metaDescription}</div>
       </div>
 
+      {draft.selectedProducts && draft.selectedProducts.length > 0 && (
+        <div className="mb-6">
+          <h4 className="font-medium mb-1 text-sm">Selected Products</h4>
+          <ul className="text-sm list-disc pl-5">
+            {draft.selectedProducts.map((p: any, i: number) => (
+              <li key={i}>{p.title || p.shopifyId} ({p.handle})</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {availableMetafields.length > 0 && (
         <div className="mb-6 text-xs">
           <div className="font-medium mb-1">Available Metafields on store (filtered by type in editor):</div>
@@ -157,6 +172,7 @@ export default async function DraftDetail({ params }: { params: Promise<{ id: st
           <textarea name="bodyHtml" defaultValue={draft.bodyHtml} className="border p-1 w-full h-40" />
           <textarea name="metafields" defaultValue={draft.metafields ? JSON.stringify(draft.metafields, null, 2) : ''} placeholder='Metafields JSON e.g. {"global.title_tag": "value"}' className="border p-1 w-full h-20 font-mono text-xs mt-2" />
           <textarea name="schemaJsonLd" defaultValue={draft.schemaJsonLd ? JSON.stringify(draft.schemaJsonLd, null, 2) : ''} placeholder='Schema JSON-LD' className="border p-1 w-full h-20 font-mono text-xs mt-1" />
+          <textarea name="selectedProducts" defaultValue={draft.selectedProducts ? JSON.stringify(draft.selectedProducts, null, 2) : ''} placeholder='Selected Products JSON (array of {shopifyId, title, handle})' className="border p-1 w-full h-16 font-mono text-xs mt-2" />
         </div>
 
         <button type="submit" className="bg-black text-white px-6 py-2">Submit Decision</button>

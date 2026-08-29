@@ -20,6 +20,7 @@ import { createAdminClient } from '../../../lib/shopify/client';
 import { fetchMetafieldDefinitions, fetchMetafieldValueSamples } from '../../../lib/shopify/content';
 import { writeKnowledge } from '../../../lib/brain/memory';
 import { listProducts, searchProducts } from '../../../lib/db/products';
+import { selectProductsForCollection } from '../../../lib/agents/seo/select-products';
 
 export const seoJob = inngest.createFunction(
   { id: 'seo-job', retries: 2, triggers: [{ event: 'seo/job.requested' }] },
@@ -185,6 +186,11 @@ export const seoJob = inngest.createFunction(
         draft = createBasicDraft(type, keyword, platform, brandVoice);
       }
 
+      if (type === 'collection') {
+        const sel = selectProductsForCollection({ storeId, keyword, brief, candidateProducts: products, llmSelectedIds: draft.selectedProductIds });
+        draft.selectedProducts = sel.selected;
+      }
+
       edited = await step.invoke('edit', {
         function: editDraftFn,
         data: { storeId, draft, type, platform, brandVoice, seoRules, metafieldDefinitions, placement, products },
@@ -229,6 +235,11 @@ export const seoJob = inngest.createFunction(
           data: { storeId, draft: current, type, platform, brandVoice, seoRules, metafieldDefinitions, placement, products },
         });
 
+        if (type === 'collection') {
+          const sel = selectProductsForCollection({ storeId, keyword, brief, candidateProducts: products, llmSelectedIds: current.selectedProductIds });
+          current.selectedProducts = sel.selected;
+        }
+
         scores = await step.invoke('grade', {
           function: gradeDraftFn,
           data: { draft: current, type, platform, brandVoice, seoRules, metafieldDefinitions, placement, products, brief, research: researchResult },
@@ -248,6 +259,11 @@ export const seoJob = inngest.createFunction(
       optimized = best;
       scores = bestFeedback;
 
+      if (type === 'collection') {
+        const sel = selectProductsForCollection({ storeId, keyword, brief, candidateProducts: products, llmSelectedIds: optimized.selectedProductIds });
+        optimized.selectedProducts = sel.selected;
+      }
+
       draftRecord = await step.invoke('save-draft', {
         function: saveDraftFn,
         data: {
@@ -262,6 +278,8 @@ export const seoJob = inngest.createFunction(
           schemaJsonLd: optimized.schemaJsonLd,
           evaluationScores: scores,
           rawResearch: researchResult,
+          selectedProducts: optimized.selectedProducts,
+          collectionRules: optimized.collectionRules,
         },
       });
 
@@ -390,6 +408,15 @@ export const seoJob = inngest.createFunction(
         result = { error: pubErr?.message || String(pubErr) };
       }
 
+      if (type === 'collection' && result) {
+        const pa = result.__productAttach || {};
+        const action = (pa.count || 0) > 0 ? 'collection.products.attached' : 'collection.products.empty';
+        await step.invoke('log-product-attach', {
+          function: logEventFn,
+          data: { storeId, actor: 'system', action, payload: { collectionId: result.__ownerId, ids: pa.ids || [], mode: pa.mode || 'manual', count: pa.count || 0 }, jobId: job.id },
+        });
+      }
+
       const hasMainResource = !!(result && (result.__ownerId || (result.data && (result.data.collectionCreate || result.data.pageCreate || result.data.articleCreate))));
 
       if (hasMainResource || !result?.error) {
@@ -437,6 +464,8 @@ function createBasicDraft(type: string, keyword: string, platform = 'shopify', b
     metaTitle: keyword,
     metaDescription: `Learn about ${keyword} in this ${type}.`,
     metafields: {},
+    selectedProducts: [],
+    collectionRules: [],
     type,
     brandVoice,
   };

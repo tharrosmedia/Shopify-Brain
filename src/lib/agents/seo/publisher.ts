@@ -129,31 +129,50 @@ export async function publishContent({ storeId, draft, type = 'collection', plat
     }
   }
 
-  // Handle products for collections (configurable via placement.collection.products)
-  if (type === 'collection' && ownerId && products.length > 0) {
-    const collPlacement = placement?.collection || placement?.default || {};
-    const prodCfg = collPlacement.products || {};
-    const mode = prodCfg.mode || 'rules'; // 'rules' | 'manual'
-    const auto = prodCfg.auto !== false; // default true
-    if (auto) {
+  // Handle products for collections (configurable via placement; prefer draft.selectedProducts)
+  let attachInfo: any = null;
+  if (type === 'collection' && ownerId) {
+    const typePlacement = config.placement?.[type] || config.placement?.default || null;
+    const prodCfg = typePlacement?.products || { mode: 'manual', auto: true };
+    const mode = prodCfg.mode || 'manual';
+    const auto = prodCfg.auto !== false;
+    const fromDraft = (draft.selectedProducts || []).map((p: any) => p.shopifyId).filter(Boolean);
+    const fromJob = (products || []).map((p: any) => p.shopifyId).filter(Boolean);
+    let ids = fromDraft.length ? fromDraft : fromJob;
+    ids = Array.from(new Set(ids)).filter(Boolean);
+    const max = prodCfg.maxProducts;
+    if (max && max > 0) ids = ids.slice(0, max);
+    if (auto === false) {
+      warnings.push('products: attach skipped (auto=false)');
+      attachInfo = { ids: [], mode: 'skipped', count: 0 };
+    } else if (ids.length === 0) {
+      warnings.push('products: no valid ids');
+      attachInfo = { ids: [], mode, count: 0 };
+    } else if (mode === 'rules' && (draft.collectionRules || []).length) {
       try {
-        const prodIds = products.slice(0, 10).map((p: any) => p.shopifyId).filter(Boolean);
-        if (mode === 'manual' && prodIds.length) {
-          await addProductsToCollection(client, ownerId, prodIds);
-        } else if (mode === 'rules') {
-          // simple rule based on keyword from draft or first products
-          const handles = products.slice(0, 5).map((p: any) => p.handle).filter(Boolean);
-          await setCollectionRules(client, ownerId, handles);
+        await setCollectionRules(client, ownerId, draft.collectionRules);
+        attachInfo = { ids, mode: 'rules', count: ids.length };
+      } catch (e: any) {
+        warnings.push(`products rules: ${e?.message || e}`);
+        try {
+          await addProductsToCollection(client, ownerId, ids);
+          attachInfo = { ids, mode: 'manual-fallback', count: ids.length };
+        } catch (e2: any) {
+          warnings.push(`products: ${e2?.message || e2}`);
         }
+      }
+    } else {
+      try {
+        await addProductsToCollection(client, ownerId, ids);
+        attachInfo = { ids, mode: 'manual', count: ids.length };
       } catch (e: any) {
         warnings.push(`products: ${e?.message || e}`);
-        console.warn('[PUBLISH] product add to collection failed (non-fatal)', e);
       }
     }
   }
 
   // Always return success info for the main resource + any warnings
-  return { ...response, __ownerId: ownerId, __warnings: warnings };
+  return { ...response, __ownerId: ownerId, __warnings: warnings, __productAttach: attachInfo };
 }
 
 export const publishCatalogPage = publishContent;

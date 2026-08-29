@@ -11,6 +11,9 @@ const ReviseSchema = z.object({
   metaDescription: z.string(),
   metafields: z.record(z.string(), z.string()).optional(),
   schemaJsonLd: z.any().optional(),
+  selectedProductIds: z.array(z.string()).optional(),
+  collectionStrategy: z.enum(['manual', 'rules']).optional(),
+  collectionRules: z.array(z.object({ column: z.string(), relation: z.string(), condition: z.string() })).optional(),
 });
 
 export async function reviseDraft({
@@ -79,13 +82,14 @@ ${current}
 Available metafield definitions (use relevant ones selectively for structure e.g. FAQs when they exist for this type; use "namespace.key" keys):
 ${defsStr}
 
-Available products (reference real ones naturally for recommendations, collection inclusion, credibility):
+  Available products (reference real ones naturally for recommendations, collection inclusion, credibility; for selectedProductIds copy exact shopifyId from list):
 ${productsStr}
 
 Rules:
-- You MAY change title, handle, metaTitle, metaDescription, bodyHtml, metafields, schema as needed.
+- You MAY change title, handle, metaTitle, metaDescription, bodyHtml, metafields, schema, selectedProductIds, collectionStrategy, collectionRules as needed.
 - Address all rule violations from grader feedback.
 - Do not duplicate content between body and metas.
+- IDs for selectedProductIds must come only from provided products list.
 
 Return the complete improved structured draft.`;
 

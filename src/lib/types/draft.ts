@@ -4,7 +4,10 @@ export interface CatalogDraft {
   bodyHtml: string;
   metaTitle: string;
   metaDescription: string;
-  metafields?: Record<string, unknown>;
+  metafields?: Record<string, unknown> | Array<{ namespace: string; key: string; type: string; value: string }>;
   schemaJsonLd?: Record<string, unknown>;
-  evaluationScores?: Record<string, number>;
+  evaluationScores?: any;
+  selectedProducts?: Array<{ shopifyId: string; title?: string; handle?: string; imageUrl?: string }>;
+  collectionRules?: any[];
+  collectionStrategy?: 'manual' | 'rules';
 }
