@@ -39,7 +39,7 @@ export default async function Review({ searchParams }: { searchParams: Promise<{
 
       {params.success === 'decision-submitted' && (
         <div className="mb-4 p-3 bg-green-100 text-green-700 rounded text-sm">
-          Decision submitted! Inngest will process the approval and publish if approved.
+          Decision submitted! Publishing to Shopify (usually under 30s). Check job status or Shopify admin.
         </div>
       )}
 

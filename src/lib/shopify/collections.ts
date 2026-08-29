@@ -55,32 +55,26 @@ export async function addProductsToCollection(adminClient: any, collectionId: st
   return response;
 }
 
-export async function setCollectionRules(adminClient: any, collectionId: string, handles: string[]) {
-  // Simple rules: match product handles or titles containing
-  const rules = handles.map(h => ({
-    column: 'TITLE',
-    relation: 'CONTAINS',
-    condition: h.split('-').join(' '),
-  }));
+export async function setCollectionRules(adminClient: any, collectionId: string, rules: any[]) {
   const mutation = `
-    mutation collectionUpdate($id: ID!, $input: CollectionInput!) {
-      collectionUpdate(id: $id, input: $input) {
+    mutation collectionUpdate($input: CollectionInput!) {
+      collectionUpdate(input: $input) {
         collection { id }
         userErrors { field message }
       }
     }
   `;
   const input: any = {
+    id: collectionId,
     ruleSet: {
-      appliedDisjunctively: false,
-      rules,
+      appliedDisjunctively: true,
+      rules: rules || [],
     },
   };
-  const response = await adminClient.request(mutation, { variables: { id: collectionId, input } });
+  const response = await adminClient.request(mutation, { variables: { input } });
   const errors = response?.data?.collectionUpdate?.userErrors || [];
   if (errors.length) {
-    // fallback to manual add if rules fail
-    console.warn('set rules failed, may need manual');
+    throw new Error(errors.map((e: any) => e.message).join('; '));
   }
   return response;
 }

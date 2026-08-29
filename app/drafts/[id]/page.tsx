@@ -19,12 +19,40 @@ async function decide(formData: FormData) {
 
   let editedPayload: any = undefined;
   if (status === 'edited') {
-    let metafields = undefined;
-    const mfStr = formData.get('metafields') as string;
-    if (mfStr) { try { metafields = JSON.parse(mfStr); } catch {} }
+    // Build metafields as typed array (P1): from per-slot fields + additional JSON
+    const mfs: Array<{namespace: string; key: string; type?: string; value: string}> = [];
+    // collect slot values if provided e.g. mfslot_0_value
+    for (const [k, v] of formData.entries()) {
+      if (k.startsWith('mfslot_') && k.endsWith('_value') && v) {
+        const idx = k.replace('mfslot_','').replace('_value','');
+        const ns = formData.get(`mfslot_${idx}_ns`) as string || 'custom';
+        const ky = formData.get(`mfslot_${idx}_key`) as string || '';
+        const ty = formData.get(`mfslot_${idx}_type`) as string || undefined;
+        if (ky) mfs.push({ namespace: ns, key: ky, type: ty, value: String(v) });
+      }
+    }
+    let mfStr = formData.get('metafields') as string;
+    if (mfStr) {
+      try {
+        const addl = JSON.parse(mfStr);
+        if (Array.isArray(addl)) {
+          for (const a of addl) if (a && a.key) mfs.push({namespace: a.namespace||'custom', key: a.key, type: a.type, value: String(a.value||'')});
+        } else if (addl && typeof addl === 'object') {
+          for (const [full, val] of Object.entries(addl)) {
+            let ns='custom', ky=full;
+            if (full.includes('.')) { const p=full.split('.'); ns=p[0]; ky=p.slice(1).join('.'); }
+            mfs.push({namespace: ns, key: ky, value: String(val)});
+          }
+        }
+      } catch {}
+    }
+    const metafields = mfs.length ? mfs : undefined;
     let schemaJsonLd = undefined;
     const sjStr = formData.get('schemaJsonLd') as string;
     if (sjStr) { try { schemaJsonLd = JSON.parse(sjStr); } catch {} }
+    let selectedProducts = undefined;
+    const spStr = formData.get('selectedProducts') as string;
+    if (spStr) { try { selectedProducts = JSON.parse(spStr); } catch {} }
     editedPayload = {
       title: formData.get('title'),
       handle: formData.get('handle'),
@@ -33,6 +61,7 @@ async function decide(formData: FormData) {
       metaDescription: formData.get('metaDescription'),
       metafields,
       schemaJsonLd,
+      selectedProducts,
     };
     await updateDraft(draftId, editedPayload);
   }
@@ -86,13 +115,17 @@ export default async function DraftDetail({ params }: { params: Promise<{ id: st
   } catch {}
 
   let availableMetafields: any[] = [];
+  let placement: any = null;
   try {
     const sid = await getActiveStoreId();
     if (sid) {
       const s = await getStore(sid);
-      if (s && s.shopify_access_token) {
-        const client = createAdminClient(s.shopify_domain, s.shopify_access_token);
-        availableMetafields = await fetchMetafieldDefinitions(client);
+      if (s) {
+        placement = s.config?.placement || null;
+        if (s.shopify_access_token) {
+          const client = createAdminClient(s.shopify_domain, s.shopify_access_token);
+          availableMetafields = await fetchMetafieldDefinitions(client);
+        }
       }
     }
   } catch {}
@@ -118,6 +151,38 @@ export default async function DraftDetail({ params }: { params: Promise<{ id: st
         <div>Meta Title: {draft.metaTitle}</div>
         <div>Meta Desc: {draft.metaDescription}</div>
       </div>
+
+      {draft.selectedProducts && draft.selectedProducts.length > 0 && (
+        <div className="mb-6">
+          <h4 className="font-medium mb-1 text-sm">Selected Products</h4>
+          <ul className="text-sm list-disc pl-5">
+            {draft.selectedProducts.map((p: any, i: number) => (
+              <li key={i}>{p.title || p.shopifyId} ({p.handle})</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {draft.metafields && (Array.isArray(draft.metafields) ? draft.metafields.length : Object.keys(draft.metafields).length) > 0 && (
+        <div className="mb-4 text-xs">
+          <h4 className="font-medium mb-1">Metafields</h4>
+          <pre className="bg-white p-2 border overflow-auto">{JSON.stringify(draft.metafields, null, 2)}</pre>
+        </div>
+      )}
+
+      {(draft.rawResearch || draft.evaluationScores) && (
+        <div className="mb-6 text-sm border p-3 bg-muted">
+          <h4 className="font-medium mb-1">Brief / Research / Gate (P2)</h4>
+          {draft.rawResearch?.summary && <div className="mb-1">Research: {draft.rawResearch.summary.slice(0,300)}...</div>}
+          {draft.evaluationScores?.topicGate && (
+            <div className="mt-1">
+              Topic Gate: {draft.evaluationScores.topicGate.onTopic ? 'ON-TOPIC' : 'OFF-TOPIC'} 
+              {draft.evaluationScores.topicGate.violations?.length ? ` | Violations: ${draft.evaluationScores.topicGate.violations.join('; ')}` : ''}
+            </div>
+          )}
+          {draft.evaluationScores && <div className="text-xs mt-1">Scores: {JSON.stringify(draft.evaluationScores).slice(0,200)}</div>}
+        </div>
+      )}
 
       {availableMetafields.length > 0 && (
         <div className="mb-6 text-xs">
@@ -154,9 +219,30 @@ export default async function DraftDetail({ params }: { params: Promise<{ id: st
           <input name="handle" defaultValue={draft.handle} placeholder="Handle" className="border p-1 w-full mb-2" />
           <input name="metaTitle" defaultValue={draft.metaTitle} placeholder="Meta Title" className="border p-1 w-full mb-2" />
           <input name="metaDescription" defaultValue={draft.metaDescription} placeholder="Meta Desc" className="border p-1 w-full mb-2" />
-          <textarea name="bodyHtml" defaultValue={draft.bodyHtml} className="border p-1 w-full h-40" />
-          <textarea name="metafields" defaultValue={draft.metafields ? JSON.stringify(draft.metafields, null, 2) : ''} placeholder='Metafields JSON e.g. {"global.title_tag": "value"}' className="border p-1 w-full h-20 font-mono text-xs mt-2" />
-          <textarea name="schemaJsonLd" defaultValue={draft.schemaJsonLd ? JSON.stringify(draft.schemaJsonLd, null, 2) : ''} placeholder='Schema JSON-LD' className="border p-1 w-full h-20 font-mono text-xs mt-1" />
+           <textarea name="bodyHtml" defaultValue={draft.bodyHtml} className="border p-1 w-full h-40" />
+           {/* P1: per-slot metafield textareas from placement (server rendered) + additional JSON */}
+           {placement && placement.metafields && Array.isArray(placement.metafields) && placement.metafields.length > 0 && (
+             <div className="mt-2">
+               <div className="text-xs font-medium mb-1">Placement Metafield Slots (edit values)</div>
+               {placement.metafields.map((rule: any, i: number) => {
+                 const t = rule.target || {};
+                 const cur = Array.isArray(draft.metafields) ? draft.metafields.find((m:any)=> m.namespace===t.namespace && m.key===t.key) : null;
+                 const defVal = cur ? cur.value : '';
+                 return (
+                   <div key={i} className="mb-1">
+                     <input type="hidden" name={`mfslot_${i}_ns`} value={t.namespace || 'custom'} />
+                     <input type="hidden" name={`mfslot_${i}_key`} value={t.key || ''} />
+                     <input type="hidden" name={`mfslot_${i}_type`} value={t.type || ''} />
+                     <label className="text-[10px] block">{t.namespace}.{t.key} ({t.type || 'text'})</label>
+                     <textarea name={`mfslot_${i}_value`} defaultValue={defVal} className="border p-1 w-full h-12 font-mono text-xs" placeholder="value for this slot" />
+                   </div>
+                 );
+               })}
+             </div>
+           )}
+           <textarea name="metafields" defaultValue={draft.metafields ? JSON.stringify(draft.metafields, null, 2) : ''} placeholder='Additional metafields JSON (array or record; will merge to typed array)' className="border p-1 w-full h-16 font-mono text-xs mt-2" />
+           <textarea name="schemaJsonLd" defaultValue={draft.schemaJsonLd ? JSON.stringify(draft.schemaJsonLd, null, 2) : ''} placeholder='Schema JSON-LD' className="border p-1 w-full h-20 font-mono text-xs mt-1" />
+           <textarea name="selectedProducts" defaultValue={draft.selectedProducts ? JSON.stringify(draft.selectedProducts, null, 2) : ''} placeholder='Selected Products JSON (array of {shopifyId, title, handle})' className="border p-1 w-full h-16 font-mono text-xs mt-2" />
         </div>
 
         <button type="submit" className="bg-black text-white px-6 py-2">Submit Decision</button>

@@ -290,7 +290,7 @@ async function generatePlacementSuggestion() {
     // Add product config option for collections
     if (!newPlacement.collection) newPlacement.collection = {};
     if (!newPlacement.collection.products) {
-      newPlacement.collection.products = { mode: 'rules', auto: true };
+      newPlacement.collection.products = { mode: 'manual', auto: true };
     }
     const suggestedConfig = { placement: newPlacement };
     const json = JSON.stringify(suggestedConfig, null, 2);

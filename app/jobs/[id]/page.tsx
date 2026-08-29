@@ -7,6 +7,7 @@ import { cookies } from 'next/headers';
 import { listStores, getActiveStoreId, getStore } from '@/src/lib/db/stores';
 import { notFound } from 'next/navigation';
 import { inngest } from '@/src/inngest/client';
+import AutoRefresh from '@/components/auto-refresh';
 
 export const dynamic = 'force-dynamic';
 
@@ -89,14 +90,19 @@ export default async function JobDetail({ params }: { params: Promise<{ id: stri
       <Link href="/" className="underline">← Dashboard</Link>
       <Link href="/history" className="underline ml-4">History</Link>
       <h1 className="text-2xl font-bold my-6">Job {job.id.slice(0, 8)}</h1>
+      {(job.status === 'publishing' || job.status === 'awaiting_approval') && <AutoRefresh interval={3000} />}
 
       <div className="mb-6 border p-4 rounded text-sm">
-        <div><strong>Status:</strong> {job.status}</div>
+        <div><strong>Status:</strong> {job.status}{job.status === 'publishing' ? ' (creating in Shopify, should be <30s)' : ''}</div>
         <div><strong>Type:</strong> {job.type}</div>
         <div><strong>Keyword / Input:</strong> {keyword}</div>
         <div><strong>Created:</strong> {new Date(job.createdAt).toLocaleString()}</div>
         <div><strong>Full ID:</strong> {job.id}</div>
       </div>
+
+      {job.status === 'publishing' && (
+        <div className="mb-4 p-3 bg-blue-100 text-blue-700 rounded text-sm">Publishing in progress. The resource will appear in Shopify shortly. Refresh to update.</div>
+      )}
 
       {['queued', 'failed', 'timeout'].includes(job.status) && (
         <form action={requeueJob} className="mb-6">
@@ -163,6 +169,9 @@ export default async function JobDetail({ params }: { params: Promise<{ id: stri
         {job.output ? (
           <>
             <pre className="bg-muted p-4 text-xs overflow-auto max-h-96">{JSON.stringify(job.output, null, 2)}</pre>
+            {job.output?.__warnings && job.output.__warnings.length > 0 && (
+              <div className="mt-2 text-xs text-orange-600">Warnings: {job.output.__warnings.join('; ')}</div>
+            )}
             {/* Constructed links */}
             {(() => {
               const out = job.output?.data || job.output;

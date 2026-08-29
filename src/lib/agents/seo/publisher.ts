@@ -23,13 +23,19 @@ function getResourceId(response: any, type: string): string | null {
   return response?.data?.collectionCreate?.collection?.id || null;
 }
 
-export async function publishContent({ storeId, draft, type = 'collection', platform, brandVoice, products = [] }: { storeId: string; draft: any; type?: string; platform?: string; brandVoice?: any; products?: any[] }) {
-  const store = await getStore(storeId);
+export async function publishContent({ storeId, draft, type = 'collection', platform, brandVoice, products = [], preloaded }: { storeId: string; draft: any; type?: string; platform?: string; brandVoice?: any; products?: any[]; preloaded?: { domain?: string; accessToken?: string; config?: any } }) {
+  console.time('[PUBLISH] total');
+  let store: any;
+  if (preloaded && preloaded.accessToken) {
+    store = { shopify_domain: preloaded.domain, shopify_access_token: preloaded.accessToken, config: preloaded.config };
+  } else {
+    store = await getStore(storeId);
+  }
   if (!store || !store.shopify_access_token) {
     throw new Error(`No Shopify credentials configured for store ${storeId}`);
   }
   const client = createAdminClient(store.shopify_domain, store.shopify_access_token);
-  const config = (store as any).config || {};
+  const config = store.config || (store as any).config || {};
   const placement = config.placement?.[type] || config.placement?.default || null;
   let bodyForMain: string | undefined = draft.bodyHtml;
   let useMainBody = true;
@@ -65,20 +71,32 @@ export async function publishContent({ storeId, draft, type = 'collection', plat
   }
 
   // Auto-set any metafields the agent produced (supports agent-created keys + "namespace.key"; best for agent)
-  for (const [fullKey, val] of Object.entries(draft.metafields || {})) {
-    if (val == null) continue;
-    let ns = 'custom';
-    let k = fullKey;
-    if (fullKey.includes('.')) {
-      const parts = fullKey.split('.');
-      ns = parts[0];
-      k = parts.slice(1).join('.');
+  // Handle both record (legacy) and array (structured) forms for metafields
+  const mfSource = draft.metafields;
+  if (Array.isArray(mfSource)) {
+    for (const mf of mfSource) {
+      if (!mf || !mf.namespace || !mf.key || mf.value == null) continue;
+      const already = mfs.some((m: any) => m.namespace === mf.namespace && m.key === mf.key);
+      if (!already) {
+        mfs.push({ namespace: mf.namespace, key: mf.key, value: String(mf.value), type: mf.type || 'single_line_text_field' });
+      }
     }
-    const already = mfs.some((m: any) => m.namespace === ns && m.key === k);
-    if (!already) {
-      const v = typeof val === 'object' ? JSON.stringify(val) : String(val);
-      const t = v.includes('<') || v.includes('</') ? 'multi_line_text_field' : 'single_line_text_field';
-      mfs.push({ namespace: ns, key: k, value: v, type: t });
+  } else if (mfSource && typeof mfSource === 'object') {
+    for (const [fullKey, val] of Object.entries(mfSource)) {
+      if (val == null) continue;
+      let ns = 'custom';
+      let k = fullKey;
+      if (fullKey.includes('.')) {
+        const parts = fullKey.split('.');
+        ns = parts[0];
+        k = parts.slice(1).join('.');
+      }
+      const already = mfs.some((m: any) => m.namespace === ns && m.key === k);
+      if (!already) {
+        const v = typeof val === 'object' ? JSON.stringify(val) : String(val);
+        const t = v.includes('<') || v.includes('</') ? 'multi_line_text_field' : 'single_line_text_field';
+        mfs.push({ namespace: ns, key: k, value: v, type: t });
+      }
     }
   }
 
@@ -115,45 +133,70 @@ export async function publishContent({ storeId, draft, type = 'collection', plat
   } else if (type === 'blog') {
     response = await createAndPublishArticle(client, mainInput);
   } else {
+    console.time('[PUBLISH] create-main');
     response = await createAndPublishCollection(client, mainInput);
+    console.timeEnd('[PUBLISH] create-main');
   }
   const ownerId = getResourceId(response, type);
   const warnings: string[] = [];
 
   if (ownerId && mfs.length > 0) {
+    console.log('[PUBLISH] setting metafields', mfs.length);
     try {
       await setMetafields(client, ownerId, mfs);
     } catch (e: any) {
       warnings.push(`metafields: ${e?.message || e}`);
       console.warn('[PUBLISH] setMetafields failed (non-fatal)', e);
     }
+  } else if (ownerId) {
+    console.log('[PUBLISH] no metafields to set (mfs empty, placement or draft may not define any)');
   }
 
-  // Handle products for collections (configurable via placement.collection.products)
-  if (type === 'collection' && ownerId && products.length > 0) {
-    const collPlacement = placement?.collection || placement?.default || {};
-    const prodCfg = collPlacement.products || {};
-    const mode = prodCfg.mode || 'rules'; // 'rules' | 'manual'
-    const auto = prodCfg.auto !== false; // default true
-    if (auto) {
+  // Handle products for collections (configurable via placement; prefer draft.selectedProducts)
+  let attachInfo: any = null;
+  if (type === 'collection' && ownerId) {
+    const typePlacement = config.placement?.[type] || config.placement?.default || null;
+    const prodCfg = typePlacement?.products || { mode: 'manual', auto: true };
+    const mode = prodCfg.mode || 'manual';
+    const auto = prodCfg.auto !== false;
+    const fromDraft = (draft.selectedProducts || []).map((p: any) => p.shopifyId).filter(Boolean);
+    const fromJob = (products || []).map((p: any) => p.shopifyId).filter(Boolean);
+    let ids = fromDraft.length ? fromDraft : fromJob;
+    ids = Array.from(new Set(ids)).filter(Boolean);
+    const max = prodCfg.maxProducts;
+    if (max && max > 0) ids = ids.slice(0, max);
+    if (auto === false) {
+      warnings.push('products: attach skipped (auto=false)');
+      attachInfo = { ids: [], mode: 'skipped', count: 0 };
+    } else if (ids.length === 0) {
+      warnings.push('products: no valid ids');
+      attachInfo = { ids: [], mode, count: 0 };
+    } else if (mode === 'rules' && (draft.collectionRules || []).length) {
       try {
-        const prodIds = products.slice(0, 10).map((p: any) => p.shopifyId).filter(Boolean);
-        if (mode === 'manual' && prodIds.length) {
-          await addProductsToCollection(client, ownerId, prodIds);
-        } else if (mode === 'rules') {
-          // simple rule based on keyword from draft or first products
-          const handles = products.slice(0, 5).map((p: any) => p.handle).filter(Boolean);
-          await setCollectionRules(client, ownerId, handles);
+        await setCollectionRules(client, ownerId, draft.collectionRules);
+        attachInfo = { ids, mode: 'rules', count: ids.length };
+      } catch (e: any) {
+        warnings.push(`products rules: ${e?.message || e}`);
+        try {
+          await addProductsToCollection(client, ownerId, ids);
+          attachInfo = { ids, mode: 'manual-fallback', count: ids.length };
+        } catch (e2: any) {
+          warnings.push(`products: ${e2?.message || e2}`);
         }
+      }
+    } else {
+      try {
+        await addProductsToCollection(client, ownerId, ids);
+        attachInfo = { ids, mode: 'manual', count: ids.length };
       } catch (e: any) {
         warnings.push(`products: ${e?.message || e}`);
-        console.warn('[PUBLISH] product add to collection failed (non-fatal)', e);
       }
     }
   }
 
   // Always return success info for the main resource + any warnings
-  return { ...response, __ownerId: ownerId, __warnings: warnings };
+  console.timeEnd('[PUBLISH] total');
+  return { ...response, __ownerId: ownerId, __warnings: warnings, __productAttach: attachInfo };
 }
 
 export const publishCatalogPage = publishContent;

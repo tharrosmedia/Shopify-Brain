@@ -19,6 +19,7 @@ export interface Placement {
   products?: {
     mode?: 'manual' | 'rules';
     auto?: boolean;
+    maxProducts?: number;
   };
 }
 

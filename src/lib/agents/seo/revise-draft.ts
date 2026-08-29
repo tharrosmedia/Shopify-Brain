@@ -9,8 +9,11 @@ const ReviseSchema = z.object({
   bodyHtml: z.string(),
   metaTitle: z.string(),
   metaDescription: z.string(),
-  metafields: z.record(z.string(), z.string()).optional(),
+  metafields: z.array(z.object({ namespace: z.string(), key: z.string(), type: z.string().optional(), value: z.string() })).optional(),
   schemaJsonLd: z.any().optional(),
+  selectedProductIds: z.array(z.string()).optional(),
+  collectionStrategy: z.enum(['manual', 'rules']).optional(),
+  collectionRules: z.array(z.object({ column: z.string(), relation: z.string(), condition: z.string() })).optional(),
 });
 
 export async function reviseDraft({
@@ -25,6 +28,7 @@ export async function reviseDraft({
   products = [],
   brief,
   research,
+  metafieldSamples = [],
 }: {
   draft: any;
   feedback: any;
@@ -37,22 +41,26 @@ export async function reviseDraft({
   products?: any[];
   brief?: any;
   research?: any;
+  metafieldSamples?: any[];
 }) {
   const bv = brandVoice ? (typeof brandVoice === 'string' ? brandVoice : brandVoice.text || '') : '';
   const intent = brief?.intent || (research?.summary ? research.summary.slice(0, 600) : '');
   const researchSum = research?.summary || brief?.researchSummary || '';
+  const currentMfs = Array.isArray(draft.metafields) ? draft.metafields : (draft.metafields ? Object.entries(draft.metafields).map(([k,v])=>({namespace:'custom',key:k,value:String(v)})) : []);
   const current = JSON.stringify({
     title: draft.title,
     handle: draft.handle,
     metaTitle: draft.metaTitle,
     metaDescription: draft.metaDescription,
     bodyHtml: (draft.bodyHtml || '').slice(0, 1400),
-    metafields: draft.metafields || {},
+    metafields: currentMfs,
   }, null, 2);
 
   const defsStr = (metafieldDefinitions && metafieldDefinitions.length)
     ? JSON.stringify(metafieldDefinitions.map((d: any) => ({ namespace: d.namespace, key: d.key, name: d.name, type: d.type?.name, description: d.description })))
     : 'none';
+
+  const samplesStr = (metafieldSamples && metafieldSamples.length) ? JSON.stringify(metafieldSamples.slice(0,3)).slice(0,1200) : 'none';
 
   const productsStr = products.length ? JSON.stringify(products.slice(0, 8).map((p: any) => ({ title: p.title, handle: p.handle, desc: (p.descriptionHtml || '').slice(0, 80) }))) : 'none';
 
@@ -76,16 +84,18 @@ ${fb}
 Current draft:
 ${current}
 
-Available metafield definitions (use relevant ones selectively for structure e.g. FAQs when they exist for this type; use "namespace.key" keys):
+Available metafield definitions (use relevant ones selectively for structure e.g. FAQs when they exist for this type; output as array of {namespace,key,type,value}):
 ${defsStr}
+Example values from store: ${samplesStr}
 
-Available products (reference real ones naturally for recommendations, collection inclusion, credibility):
+  Available products (reference real ones naturally for recommendations, collection inclusion, credibility; for selectedProductIds copy exact shopifyId from list):
 ${productsStr}
 
 Rules:
-- You MAY change title, handle, metaTitle, metaDescription, bodyHtml, metafields, schema as needed.
+- You MAY change title, handle, metaTitle, metaDescription, bodyHtml, metafields, schema, selectedProductIds, collectionStrategy, collectionRules as needed.
 - Address all rule violations from grader feedback.
 - Do not duplicate content between body and metas.
+- IDs for selectedProductIds must come only from provided products list.
 
 Return the complete improved structured draft.`;
 

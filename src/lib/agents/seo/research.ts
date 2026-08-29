@@ -3,13 +3,13 @@ import { xai, XAI_MODEL } from '../../ai/xai';
 import { buildResearchMessages } from '../../prompts/seo/research';
 import { retrieve, writeKnowledge } from '../../brain/memory';
 
-export async function research({ storeId, keyword, type = 'collection', platform, brandVoice, seoRules, metafieldDefinitions, placement, products = [] }: { storeId: string; keyword: string; type?: string; platform?: string; brandVoice?: any; seoRules?: any; metafieldDefinitions?: any[]; placement?: any; products?: any[] }) {
+export async function research({ storeId, keyword, type = 'collection', platform, brandVoice, seoRules, metafieldDefinitions, placement, products = [], metafieldSamples = [] }: { storeId: string; keyword: string; type?: string; platform?: string; brandVoice?: any; seoRules?: any; metafieldDefinitions?: any[]; placement?: any; products?: any[]; metafieldSamples?: any[] }) {
   const tavilyRes = await fetch('https://api.tavily.com/search', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       api_key: process.env.TAVILY_API_KEY,
-      query: keyword,
+      query: `${keyword} ${type} SEO best practices guide`,
       max_results: 5,
       search_depth: 'basic',
     }),

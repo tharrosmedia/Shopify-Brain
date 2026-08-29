@@ -18,6 +18,8 @@ export const saveDraftFn = inngest.createFunction(
         schemaJsonLd: data.schemaJsonLd,
         evaluationScores: data.evaluationScores,
         rawResearch: data.rawResearch,
+        selectedProducts: data.selectedProducts,
+        collectionRules: data.collectionRules,
       });
     });
   }

@@ -19,6 +19,7 @@ export const DEFAULT_SEO_RULES: readonly SEORule[] = [
   { id: 'no-dupe', category: 'overall', rule: 'Do not duplicate content between bodyHtml and metaTitle/metaDescription.' },
   { id: 'brand-voice', category: 'overall', rule: 'Match the provided brand voice in tone, vocabulary and style.' },
   { id: 'useful-seo', category: 'overall', rule: 'Overall: helpful for the user, strong SEO for the exact keyword, best possible draft for the job.' },
+  { id: 'content-topic', category: 'content', rule: 'Stay tightly on-topic per brief: cover mustCover points, avoid mustNotCover, center primaryKeyword in title/meta/body without drift.' },
 ] as const;
 
 export function getDefaultSEORules(): SEORule[] {

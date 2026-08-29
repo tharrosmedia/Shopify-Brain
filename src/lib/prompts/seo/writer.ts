@@ -18,7 +18,7 @@ export function buildWriterMessages(args: { brief: any; type?: string; brandVoic
   const bvPart = bv ? ` Follow this brand voice: ${bv}.` : '';
   const rules = formatSEORulesForPrompt(seoRules);
   return [
-    { role: 'system' as const, content: `Write high-quality SEO content for a ${p}${type} about keyword "${brief.keyword}".${bvPart} STRICTLY follow these SEO rules:\n${rules}\nUse available metafield defs and placement selectively (only what helps this job/keyword for best SEO; subset or invented "namespace.key" OK; no duplication). Full store schema (all types) is in knowledge for context; focus on relevant for this job. Use real products from context for recommendations and collections.
+    { role: 'system' as const, content: `Write high-quality SEO content for a ${p}${type} about keyword "${brief.keyword}".${bvPart} STRICTLY follow these SEO rules:\n${rules}\nUse available metafield defs and placement selectively (only what helps this job/keyword for best SEO; output metafields as array [{namespace,key,type?,value}]; subset OK; no duplication). Full store schema (all types) is in knowledge for context; focus on relevant for this job. Use real products from context for recommendations and collections. Stay on-topic per brief (cover must-cover points, primary keyword centered).
 
 CRITICAL - metaTitle must stand out in SERPs for the exact searcher intent from the brief: adaptive, benefit or specificity driven, natural keyword placement, ~50-60 chars. Avoid lazy titles.
 metaDescription: directly solves intent with value, ~155 chars, compelling and non-repetitive.` },
