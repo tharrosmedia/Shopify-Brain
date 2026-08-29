@@ -1,4 +1,11 @@
+let cachedPubId: { id: string; ts: number } | null = null;
+const PUB_CACHE_MS = 1000 * 60 * 5; // 5 min
+
 export async function getOnlineStorePublicationId(adminClient: any): Promise<string> {
+  const now = Date.now();
+  if (cachedPubId && (now - cachedPubId.ts) < PUB_CACHE_MS) {
+    return cachedPubId.id;
+  }
   const query = `
     query {
       publications(first: 10) {
@@ -18,6 +25,7 @@ export async function getOnlineStorePublicationId(adminClient: any): Promise<str
   if (!pub?.id) {
     throw new Error('No Online Store publication found. Ensure the Online Store sales channel is enabled.');
   }
+  cachedPubId = { id: pub.id, ts: now };
   return pub.id;
 }
 

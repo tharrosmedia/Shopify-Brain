@@ -11,16 +11,18 @@ import { reviseDraftFn } from './revise-draft';
 import { saveDraftFn } from './save-draft';
 import { updateJobStatusFn } from '../update-job-status';
 import { logEventFn } from '../log-event';
-import { saveApprovalFn } from './save-approval';
 import { publishFn } from './publish';
+import { publishContent } from '../../../lib/agents/seo/publisher';
 import { updateJobStatus } from '../../../lib/db/jobs';
 import { logEvent } from '../../../lib/brain/events';
+import { saveApproval } from '../../../lib/db/approvals';
 import { getStore } from '../../../lib/db/stores';
 import { createAdminClient } from '../../../lib/shopify/client';
 import { fetchMetafieldDefinitions, fetchMetafieldValueSamples } from '../../../lib/shopify/content';
 import { writeKnowledge } from '../../../lib/brain/memory';
 import { listProducts, searchProducts } from '../../../lib/db/products';
 import { selectProductsForCollection } from '../../../lib/agents/seo/select-products';
+import { checkTopicGate } from '../../../lib/agents/seo/topic-gate';
 
 export const seoJob = inngest.createFunction(
   { id: 'seo-job', retries: 2, triggers: [{ event: 'seo/job.requested' }] },
@@ -89,6 +91,7 @@ export const seoJob = inngest.createFunction(
     let placement: any = {};
     let metafieldDefinitions: any[] = []; // relevant slice for this job
     let products: any[] = [];
+    let metafieldSamples: any[] = [];
     let seoRules: any = providedSeoRules;
     try {
       const store = await getStore(storeId);
@@ -111,6 +114,8 @@ export const seoJob = inngest.createFunction(
           await writeKnowledge(storeId, `Full store metafield schema and examples: ${schemaStr}`, {
             type: 'metafield_schema_full', source: 'job'
           });
+          const key = ownerType;
+          metafieldSamples = (valueSamples && valueSamples[key] && valueSamples[key].examples) || [];
         } catch (e) {
           console.warn('[SEO] failed to write full metafield samples', e);
         }
@@ -150,7 +155,7 @@ export const seoJob = inngest.createFunction(
       try {
         researchResult = await step.invoke('research', {
           function: researchFn,
-          data: { storeId, keyword, type, platform, brandVoice, seoRules, metafieldDefinitions, placement, products },
+          data: { storeId, keyword, type, platform, brandVoice, seoRules, metafieldDefinitions, placement, products, metafieldSamples },
         });
       } catch (err: any) {
         await step.invoke('log-research-fail', {
@@ -163,20 +168,20 @@ export const seoJob = inngest.createFunction(
       try {
         brief = await step.invoke('create-brief', {
           function: createBriefFn,
-          data: { storeId, keyword, research: researchResult, type, platform, brandVoice, seoRules, metafieldDefinitions, placement, products },
+          data: { storeId, keyword, research: researchResult, type, platform, brandVoice, seoRules, metafieldDefinitions, placement, products, metafieldSamples },
         });
       } catch (err: any) {
         await step.invoke('log-brief-fail', {
           function: logEventFn,
           data: { storeId, actor: 'system', action: 'brief.failed', payload: { error: err.message || String(err) }, jobId: job.id },
         });
-        brief = { keyword, type, platform, brandVoice, intent: 'informational commercial', sections: ['intro'], researchSummary: '' };
+        brief = { keyword, type, platform, brandVoice, intent: 'informational commercial', sectionOutline: [{heading:'intro'}], researchSummary: '' };
       }
 
       try {
         draft = await step.invoke('write', {
           function: writeDraftFn,
-          data: { storeId, brief, type, platform, brandVoice, seoRules, metafieldDefinitions, placement, products },
+          data: { storeId, brief, type, platform, brandVoice, seoRules, metafieldDefinitions, placement, products, metafieldSamples },
         });
       } catch (err: any) {
         await step.invoke('log-write-fail', {
@@ -193,12 +198,12 @@ export const seoJob = inngest.createFunction(
 
       edited = await step.invoke('edit', {
         function: editDraftFn,
-        data: { storeId, draft, type, platform, brandVoice, seoRules, metafieldDefinitions, placement, products },
+        data: { storeId, draft, type, platform, brandVoice, seoRules, metafieldDefinitions, placement, products, metafieldSamples },
       });
 
       optimized = await step.invoke('optimize', {
         function: optimizeDraftFn,
-        data: { storeId, draft: edited, type, platform, brandVoice, seoRules, metafieldDefinitions, placement, products },
+        data: { storeId, draft: edited, type, platform, brandVoice, seoRules, metafieldDefinitions, placement, products, metafieldSamples },
       });
 
       // Internal grader-driven iteration (strictly internal helpers, no standalone event triggers).
@@ -207,7 +212,7 @@ export const seoJob = inngest.createFunction(
       let current = optimized;
       scores = await step.invoke('grade', {
         function: gradeDraftFn,
-        data: { draft: current, type, platform, brandVoice, seoRules, metafieldDefinitions, placement, products, brief, research: researchResult },
+        data: { draft: current, type, platform, brandVoice, seoRules, metafieldDefinitions, placement, products, brief, research: researchResult, metafieldSamples },
       });
 
       let best = current;
@@ -226,7 +231,7 @@ export const seoJob = inngest.createFunction(
 
         current = await step.invoke('revise', {
           function: reviseDraftFn,
-          data: { draft: current, feedback: scores, type, platform, brandVoice, seoRules, metafieldDefinitions, placement, products, brief, research: researchResult },
+          data: { draft: current, feedback: scores, type, platform, brandVoice, seoRules, metafieldDefinitions, placement, products, brief, research: researchResult, metafieldSamples },
         });
 
         // Re-optimize meta/schema after revision
@@ -242,7 +247,7 @@ export const seoJob = inngest.createFunction(
 
         scores = await step.invoke('grade', {
           function: gradeDraftFn,
-          data: { draft: current, type, platform, brandVoice, seoRules, metafieldDefinitions, placement, products, brief, research: researchResult },
+          data: { draft: current, type, platform, brandVoice, seoRules, metafieldDefinitions, placement, products, brief, research: researchResult, metafieldSamples },
         });
 
         if ((scores?.score ?? 0) > bestScore) {
@@ -263,6 +268,16 @@ export const seoJob = inngest.createFunction(
         const sel = selectProductsForCollection({ storeId, keyword, brief, candidateProducts: products, llmSelectedIds: optimized.selectedProductIds });
         optimized.selectedProducts = sel.selected;
       }
+
+      // P2: topic gate (advisory, annotate scores; does not block)
+      try {
+        const gate = await checkTopicGate({ draft: optimized, brief, research: researchResult });
+        if (!scores) scores = {};
+        scores.topicGate = gate;
+        if (gate.violations && gate.violations.length) {
+          scores.suggestions = [...(scores.suggestions || []), ...gate.violations.map((v: string) => `topic: ${v}`)];
+        }
+      } catch {}
 
       draftRecord = await step.invoke('save-draft', {
         function: saveDraftFn,
@@ -370,15 +385,15 @@ export const seoJob = inngest.createFunction(
     }
 
     try {
-      await step.invoke('save-approval', {
-        function: saveApprovalFn,
-        data: {
+      // Inline to cut another Inngest hop
+      await step.run('save-approval-direct', async () => {
+        return saveApproval({
           jobId: job.id,
           storeId,
           status: approvalData.status,
           reviewerNotes: approvalData.notes,
           editedPayload: approvalData.editedPayload,
-        },
+        });
       });
       const actor = approvalData.notes && approvalData.notes.includes('Auto-approved') ? 'system' : 'human';
       await step.invoke('log-approval', {
@@ -394,14 +409,36 @@ export const seoJob = inngest.createFunction(
         return { status: 'rejected' };
       }
 
+      // Immediate status for fast user feedback (even while publish runs in background)
+      await step.run('mark-publishing', async () => {
+        await updateJobStatus(job.id, 'publishing');
+        await logEvent(storeId, 'system', 'job.publishing', { type }, job.id);
+      });
+
       const finalDraft = approvalData.status === 'edited' && approvalData.editedPayload ? approvalData.editedPayload : optimized;
+
+      // P2 gate on final (edited or not) for audit
+      try {
+        const gate = await checkTopicGate({ draft: finalDraft, brief, research: researchResult });
+        if (finalDraft.evaluationScores) finalDraft.evaluationScores.topicGate = gate;
+        else finalDraft.evaluationScores = { topicGate: gate };
+      } catch {}
+
+      // Load store once for publish to avoid redundant getStore in publishContent
+      let preloadedStore: any = null;
+      try {
+        const s = await getStore(storeId);
+        if (s) preloadedStore = { domain: s.shopify_domain, accessToken: s.shopify_access_token, config: s.config };
+      } catch {}
 
       let result: any;
       try {
-        result = await step.invoke('publish', {
-          function: publishFn,
-          data: { storeId, draft: finalDraft, type, platform, brandVoice, products },
+        console.time('[PUBLISH] post-approval-to-result');
+        // Inline via step.run (instead of step.invoke to separate fn) to cut Inngest hop latency
+        result = await step.run('publish-content', async () => {
+          return publishContent({ storeId, draft: finalDraft, type, platform, brandVoice, products, preloaded: preloadedStore });
         });
+        console.timeEnd('[PUBLISH] post-approval-to-result');
       } catch (pubErr: any) {
         // If publish itself threw before creating the resource, we will fail below
         console.error('[PUBLISH] hard failure', pubErr);
@@ -463,7 +500,7 @@ function createBasicDraft(type: string, keyword: string, platform = 'shopify', b
     bodyHtml: `<h1>${keyword}</h1><p>Content for ${plat}${type} about ${keyword}. (Fallback generation — please review and edit.)</p>`,
     metaTitle: keyword,
     metaDescription: `Learn about ${keyword} in this ${type}.`,
-    metafields: {},
+    metafields: [],
     selectedProducts: [],
     collectionRules: [],
     type,

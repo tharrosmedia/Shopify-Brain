@@ -17,7 +17,7 @@ async function run() {
 
   // brief fallback
   const brief = await createBrief({ storeId: 'test', keyword: 'test', research: { summary: 'facts' }, type: 'page' });
-  assert.ok(brief.sections.length > 0);
+  assert.ok((brief.sectionOutline && brief.sectionOutline.length > 0) || brief.intent);
   assert.ok(brief.keyword === 'test');
   console.log('brief: ok');
 

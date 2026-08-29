@@ -23,13 +23,19 @@ function getResourceId(response: any, type: string): string | null {
   return response?.data?.collectionCreate?.collection?.id || null;
 }
 
-export async function publishContent({ storeId, draft, type = 'collection', platform, brandVoice, products = [] }: { storeId: string; draft: any; type?: string; platform?: string; brandVoice?: any; products?: any[] }) {
-  const store = await getStore(storeId);
+export async function publishContent({ storeId, draft, type = 'collection', platform, brandVoice, products = [], preloaded }: { storeId: string; draft: any; type?: string; platform?: string; brandVoice?: any; products?: any[]; preloaded?: { domain?: string; accessToken?: string; config?: any } }) {
+  console.time('[PUBLISH] total');
+  let store: any;
+  if (preloaded && preloaded.accessToken) {
+    store = { shopify_domain: preloaded.domain, shopify_access_token: preloaded.accessToken, config: preloaded.config };
+  } else {
+    store = await getStore(storeId);
+  }
   if (!store || !store.shopify_access_token) {
     throw new Error(`No Shopify credentials configured for store ${storeId}`);
   }
   const client = createAdminClient(store.shopify_domain, store.shopify_access_token);
-  const config = (store as any).config || {};
+  const config = store.config || (store as any).config || {};
   const placement = config.placement?.[type] || config.placement?.default || null;
   let bodyForMain: string | undefined = draft.bodyHtml;
   let useMainBody = true;
@@ -65,20 +71,32 @@ export async function publishContent({ storeId, draft, type = 'collection', plat
   }
 
   // Auto-set any metafields the agent produced (supports agent-created keys + "namespace.key"; best for agent)
-  for (const [fullKey, val] of Object.entries(draft.metafields || {})) {
-    if (val == null) continue;
-    let ns = 'custom';
-    let k = fullKey;
-    if (fullKey.includes('.')) {
-      const parts = fullKey.split('.');
-      ns = parts[0];
-      k = parts.slice(1).join('.');
+  // Handle both record (legacy) and array (structured) forms for metafields
+  const mfSource = draft.metafields;
+  if (Array.isArray(mfSource)) {
+    for (const mf of mfSource) {
+      if (!mf || !mf.namespace || !mf.key || mf.value == null) continue;
+      const already = mfs.some((m: any) => m.namespace === mf.namespace && m.key === mf.key);
+      if (!already) {
+        mfs.push({ namespace: mf.namespace, key: mf.key, value: String(mf.value), type: mf.type || 'single_line_text_field' });
+      }
     }
-    const already = mfs.some((m: any) => m.namespace === ns && m.key === k);
-    if (!already) {
-      const v = typeof val === 'object' ? JSON.stringify(val) : String(val);
-      const t = v.includes('<') || v.includes('</') ? 'multi_line_text_field' : 'single_line_text_field';
-      mfs.push({ namespace: ns, key: k, value: v, type: t });
+  } else if (mfSource && typeof mfSource === 'object') {
+    for (const [fullKey, val] of Object.entries(mfSource)) {
+      if (val == null) continue;
+      let ns = 'custom';
+      let k = fullKey;
+      if (fullKey.includes('.')) {
+        const parts = fullKey.split('.');
+        ns = parts[0];
+        k = parts.slice(1).join('.');
+      }
+      const already = mfs.some((m: any) => m.namespace === ns && m.key === k);
+      if (!already) {
+        const v = typeof val === 'object' ? JSON.stringify(val) : String(val);
+        const t = v.includes('<') || v.includes('</') ? 'multi_line_text_field' : 'single_line_text_field';
+        mfs.push({ namespace: ns, key: k, value: v, type: t });
+      }
     }
   }
 
@@ -115,18 +133,23 @@ export async function publishContent({ storeId, draft, type = 'collection', plat
   } else if (type === 'blog') {
     response = await createAndPublishArticle(client, mainInput);
   } else {
+    console.time('[PUBLISH] create-main');
     response = await createAndPublishCollection(client, mainInput);
+    console.timeEnd('[PUBLISH] create-main');
   }
   const ownerId = getResourceId(response, type);
   const warnings: string[] = [];
 
   if (ownerId && mfs.length > 0) {
+    console.log('[PUBLISH] setting metafields', mfs.length);
     try {
       await setMetafields(client, ownerId, mfs);
     } catch (e: any) {
       warnings.push(`metafields: ${e?.message || e}`);
       console.warn('[PUBLISH] setMetafields failed (non-fatal)', e);
     }
+  } else if (ownerId) {
+    console.log('[PUBLISH] no metafields to set (mfs empty, placement or draft may not define any)');
   }
 
   // Handle products for collections (configurable via placement; prefer draft.selectedProducts)
@@ -172,6 +195,7 @@ export async function publishContent({ storeId, draft, type = 'collection', plat
   }
 
   // Always return success info for the main resource + any warnings
+  console.timeEnd('[PUBLISH] total');
   return { ...response, __ownerId: ownerId, __warnings: warnings, __productAttach: attachInfo };
 }
 

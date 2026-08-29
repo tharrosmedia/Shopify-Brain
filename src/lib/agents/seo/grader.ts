@@ -25,6 +25,7 @@ export async function gradeDraft({
   products = [],
   brief,
   research,
+  metafieldSamples = [],
 }: {
   draft: any;
   type?: string;
@@ -36,6 +37,7 @@ export async function gradeDraft({
   products?: any[];
   brief?: any;
   research?: any;
+  metafieldSamples?: any[];
 }) {
   const bv = brandVoice ? (typeof brandVoice === 'string' ? brandVoice : brandVoice.text || '') : '';
   const intent = brief?.intent || (research && research.summary ? research.summary.slice(0, 500) : '');
@@ -43,10 +45,11 @@ export async function gradeDraft({
   const content = (draft.bodyHtml || '').slice(0, 1800);
   const metaT = draft.metaTitle || '';
   const metaD = draft.metaDescription || '';
-  const mfs = draft.metafields ? Object.entries(draft.metafields).map(([k, v]) => `${k}: ${(String(v) || '').slice(0, 120)}`).join(' | ') : 'none';
+  const mfs = Array.isArray(draft.metafields) ? draft.metafields.map((m:any)=>`${m.namespace}.${m.key}:${String(m.value||'').slice(0,80)}`).join(' | ') : (draft.metafields ? Object.entries(draft.metafields).map(([k, v]) => `${k}: ${(String(v) || '').slice(0, 120)}`).join(' | ') : 'none');
   const defsStr = (metafieldDefinitions && metafieldDefinitions.length)
     ? JSON.stringify(metafieldDefinitions.map((d: any) => ({ namespace: d.namespace, key: d.key, name: d.name, type: d.type?.name, description: d.description })))
     : 'none';
+  const samplesStr = (metafieldSamples && metafieldSamples.length) ? JSON.stringify(metafieldSamples.slice(0,2)).slice(0,800) : 'none';
   const prods = products.length ? products.slice(0, 6).map((p: any) => `${p.title} (/${p.handle})`).join('; ') : 'none';
   const rulesText = formatSEORulesForPrompt(seoRules);
 
@@ -64,10 +67,11 @@ Current draft:
 title: ${draft.title || ''}
 handle: ${draft.handle || ''}
 metaTitle: ${metaT}
-metaDescription: ${metaD}
+  metaDescription: ${metaD}
 bodyHtml (first 1800 chars): ${content}
 metafields used: ${mfs}
 Available metafield defs: ${defsStr}
+Example values: ${samplesStr}
 Available products for this job: ${prods}
 
 Be strict. For every rule violated, include {ruleId, note} in violations array.
@@ -90,11 +94,11 @@ Return score (0-10), 3-8 specific actionable suggestions (reference ruleIds), vi
     if (length > 400) score += 1;
     return {
       score: Math.min(7, Math.max(4, score)),
-      suggestions: ['Improve metaTitle to speak directly to searcher intent and stand out', 'Populate relevant metafields (FAQs etc.) instead of long body text', 'Reference specific products from context'],
+      suggestions: ['Improve metaTitle to speak directly to searcher intent and stand out', 'Populate relevant metafields (FAQs etc.) instead of long body text', 'Reference specific products from context', 'Ensure on-topic per brief (cover mustCover, avoid drift)'],
       violations: [],
       titleFeedback: hasMetaT ? 'Basic title present' : 'Lazy or missing title',
       metaDescriptionFeedback: hasMetaD ? 'Basic description' : 'Too short or generic',
-      contentFeedback: 'Review for repetition and structure',
+      contentFeedback: 'Review for repetition and structure; check topic adherence',
       metafieldFeedback: 'Check if available structured fields were used',
       productFeedback: 'Consider adding real product mentions',
       type,
