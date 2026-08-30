@@ -9,7 +9,7 @@ const OptimizeSchema = z.object({
   schemaJsonLd: z.any(),
 });
 
-export async function optimizeDraft({ storeId, draft, type = 'collection', platform, brandVoice, seoRules, metafieldDefinitions, placement, products = [], metafieldSamples = [] }: { storeId: string; draft: any; type?: string; platform?: string; brandVoice?: any; seoRules?: any; metafieldDefinitions?: any[]; placement?: any; products?: any[]; metafieldSamples?: any[] }) {
+export async function optimizeDraft({ storeId, draft, type = 'collection', platform, brandVoice, seoRules, metafieldDefinitions, placement, products = [], metafieldSamples = [], storeName = '', productTypes = [] }: { storeId: string; draft: any; type?: string; platform?: string; brandVoice?: any; seoRules?: any; metafieldDefinitions?: any[]; placement?: any; products?: any[]; metafieldSamples?: any[]; storeName?: string; productTypes?: string[] }) {
   const bv = brandVoice ? (typeof brandVoice === 'string' ? brandVoice : brandVoice.text || '') : '';
   const base = draft.title || draft.keyword || '';
   const defsStr = (metafieldDefinitions && metafieldDefinitions.length) ? 'defs available' : 'no defs';

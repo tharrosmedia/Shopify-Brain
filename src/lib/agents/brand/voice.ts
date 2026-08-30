@@ -90,6 +90,8 @@ export async function inferBrandVoice({ storeId }: { storeId: string }) {
 
   return {
     text: voiceText,
+    allowedClaims: [],
+    forbiddenClaims: [],
     inferredAt: new Date().toISOString(),
     samplesUsed: samples.length,
   };

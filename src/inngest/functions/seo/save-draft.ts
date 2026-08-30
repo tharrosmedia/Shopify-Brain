@@ -20,6 +20,7 @@ export const saveDraftFn = inngest.createFunction(
         rawResearch: data.rawResearch,
         selectedProducts: data.selectedProducts,
         collectionRules: data.collectionRules,
+        brief: data.brief,
       });
     });
   }

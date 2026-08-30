@@ -142,6 +142,8 @@ async function saveBrandVoiceAction(formData: FormData) {
   const { revalidatePath } = await import('next/cache');
   const { redirect } = await import('next/navigation');
   const text = formData.get('brandVoiceText') as string || '';
+  const allowedClaimsStr = formData.get('allowedClaims') as string || '';
+  const forbiddenClaimsStr = formData.get('forbiddenClaims') as string || '';
   const store = await getActiveStore();
   if (!store) {
     revalidatePath('/settings');
@@ -150,7 +152,9 @@ async function saveBrandVoiceAction(formData: FormData) {
   }
   const currentConfig = store.config || {};
   const existing = currentConfig.brandVoice || {};
-  const newBv = typeof existing === 'object' ? { ...existing, text } : { text };
+  const allowedClaims = allowedClaimsStr ? allowedClaimsStr.split(',').map(s => s.trim()).filter(Boolean) : (existing.allowedClaims || []);
+  const forbiddenClaims = forbiddenClaimsStr ? forbiddenClaimsStr.split(',').map(s => s.trim()).filter(Boolean) : (existing.forbiddenClaims || []);
+  const newBv = typeof existing === 'object' ? { ...existing, text, allowedClaims, forbiddenClaims } : { text, allowedClaims, forbiddenClaims };
   const newConfig = { ...currentConfig, brandVoice: newBv };
   await updateStore(store.id, {
     name: store.name,
@@ -505,7 +509,7 @@ export default async function Settings({ searchParams }: { searchParams?: Promis
             <div>Placement: {config.placement ? 'Configured' : 'Using defaults'}</div>
             <div>Metafields: {config.metafieldSchema?.lastRefreshed ? `Refreshed ${new Date(config.metafieldSchema.lastRefreshed).toLocaleDateString()} (${config.metafieldSchema.definitions?.length || 0} fields)` : 'Not loaded (use Refresh button)'}</div>
             <div>Products: {config.productsLastSynced ? `Synced ${new Date(config.productsLastSynced).toLocaleDateString()} (${config.productsSyncedCount || 0} products)` : 'Not synced (use button below)'}</div>
-            <div>Brand Voice: {bv ? 'Set' : 'Not set'}{bv && bv.inferredAt ? ` (inferred ${new Date(bv.inferredAt).toLocaleDateString()})` : ''}</div>
+            <div>Brand Voice: {bv ? 'Set' : 'Not set'}{bv && bv.inferredAt ? ` (inferred ${new Date(bv.inferredAt).toLocaleDateString()})` : ''}{bv && (bv.allowedClaims || bv.forbiddenClaims) ? ' + claims' : ''}</div>
             <div>SEO Rules: {config.seoRules && Array.isArray(config.seoRules) ? `${config.seoRules.length} rules` : 'Using defaults'}</div>
             <div>Autonomy: {auto ? 'Set' : 'Defaults (all types, require approval)'}</div>
           </div>
@@ -542,6 +546,8 @@ export default async function Settings({ searchParams }: { searchParams?: Promis
         </form>
         <form action={saveBrandVoiceAction} className="space-y-2">
           <textarea name="brandVoiceText" defaultValue={bv?.text || ''} className="border p-2 w-full h-32 font-mono text-sm" placeholder="Brand voice description..." />
+          <input name="allowedClaims" defaultValue={(bv?.allowedClaims || []).join(', ')} className="border p-1 w-full text-sm" placeholder="Allowed claims (comma sep)" />
+          <input name="forbiddenClaims" defaultValue={(bv?.forbiddenClaims || []).join(', ')} className="border p-1 w-full text-sm" placeholder="Forbidden claims (comma sep, go to mustNotCover)" />
           <Button type="submit">Save Brand Voice</Button>
         </form>
         {bv && <div className="mt-2 text-xs text-muted-foreground">Last updated: {bv.inferredAt ? new Date(bv.inferredAt).toLocaleString() : 'manual'} | Samples used: {bv.samplesUsed || 'n/a'}</div>}

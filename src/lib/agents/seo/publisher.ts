@@ -23,7 +23,17 @@ function getResourceId(response: any, type: string): string | null {
   return response?.data?.collectionCreate?.collection?.id || null;
 }
 
-export async function publishContent({ storeId, draft, type = 'collection', platform, brandVoice, products = [], preloaded }: { storeId: string; draft: any; type?: string; platform?: string; brandVoice?: any; products?: any[]; preloaded?: { domain?: string; accessToken?: string; config?: any } }) {
+function resolveMfType(defs: any[], ns: string, key: string, valForHeuristic?: string): string {
+  const d = (defs || []).find((x: any) => x.namespace === ns && x.key === key);
+  if (d?.type?.name) return d.type.name;
+  // length heuristic only as last resort
+  if (valForHeuristic && typeof valForHeuristic === 'string' && valForHeuristic.length > 150) {
+    return 'multi_line_text_field';
+  }
+  return 'single_line_text_field';
+}
+
+export async function publishContent({ storeId, draft, type = 'collection', platform, brandVoice, products = [], preloaded, metafieldDefinitions = [] }: { storeId: string; draft: any; type?: string; platform?: string; brandVoice?: any; products?: any[]; preloaded?: { domain?: string; accessToken?: string; config?: any }; metafieldDefinitions?: any[] }) {
   console.time('[PUBLISH] total');
   let store: any;
   if (preloaded && preloaded.accessToken) {
@@ -50,7 +60,7 @@ export async function publishContent({ storeId, draft, type = 'collection', plat
           namespace: bodyRule.metafield.namespace,
           key: bodyRule.metafield.key,
           value: draft.bodyHtml || '',
-          type: bodyRule.metafield.type || 'multi_line_text_field',
+          type: bodyRule.metafield.type || resolveMfType(metafieldDefinitions, bodyRule.metafield.namespace, bodyRule.metafield.key, draft.bodyHtml),
         });
       }
     }
@@ -63,7 +73,7 @@ export async function publishContent({ storeId, draft, type = 'collection', plat
             namespace: rule.target.namespace,
             key: rule.target.key,
             value: v,
-            type: rule.target.type || (rule.source === 'schemaJsonLd' ? 'json' : 'multi_line_text_field'),
+            type: rule.target.type || resolveMfType(metafieldDefinitions, rule.target.namespace, rule.target.key, String(val)),
           });
         }
       }
@@ -78,7 +88,7 @@ export async function publishContent({ storeId, draft, type = 'collection', plat
       if (!mf || !mf.namespace || !mf.key || mf.value == null) continue;
       const already = mfs.some((m: any) => m.namespace === mf.namespace && m.key === mf.key);
       if (!already) {
-        mfs.push({ namespace: mf.namespace, key: mf.key, value: String(mf.value), type: mf.type || 'single_line_text_field' });
+        mfs.push({ namespace: mf.namespace, key: mf.key, value: String(mf.value), type: mf.type || resolveMfType(metafieldDefinitions, mf.namespace, mf.key, String(mf.value)) });
       }
     }
   } else if (mfSource && typeof mfSource === 'object') {
@@ -94,7 +104,7 @@ export async function publishContent({ storeId, draft, type = 'collection', plat
       const already = mfs.some((m: any) => m.namespace === ns && m.key === k);
       if (!already) {
         const v = typeof val === 'object' ? JSON.stringify(val) : String(val);
-        const t = v.includes('<') || v.includes('</') ? 'multi_line_text_field' : 'single_line_text_field';
+        const t = resolveMfType(metafieldDefinitions, ns, k, v);
         mfs.push({ namespace: ns, key: k, value: v, type: t });
       }
     }
