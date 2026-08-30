@@ -1,6 +1,8 @@
 export function selectProductsForCollection({ storeId, keyword = '', brief, candidateProducts = [], llmSelectedIds = [], max }: { storeId: string; keyword?: string; brief?: any; candidateProducts?: any[]; llmSelectedIds?: string[]; max?: number }) {
   const k = keyword.toLowerCase();
-  const llmSet = new Set(llmSelectedIds || []);
+  const planIds = (brief?.productPlan?.selectedProductIds || []);
+  const planSet = new Set(planIds);
+  const llmSet = new Set([...(llmSelectedIds || []), ...planIds]);
   const seen = new Set<string>();
   let ranked: any[] = [];
 
@@ -10,7 +12,8 @@ export function selectProductsForCollection({ storeId, keyword = '', brief, cand
     const text = ((p.title || '') + ' ' + (p.handle || '') + ' ' + (p.productType || '') + ' ' + ((p.tags || []).join(' '))).toLowerCase();
     let score = 0;
     if (k && text.includes(k)) score += 10;
-    if (llmSet.has(p.shopifyId)) score += 5;
+    if (planSet.has(p.shopifyId)) score += 10; // strong seed from brief.productPlan
+    else if (llmSet.has(p.shopifyId)) score += 5;
     ranked.push({ shopifyId: p.shopifyId, title: p.title, handle: p.handle, imageUrl: p.imageUrl, score });
   }
 

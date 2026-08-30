@@ -29,6 +29,8 @@ export async function reviseDraft({
   brief,
   research,
   metafieldSamples = [],
+  storeName = '',
+  productTypes = [],
 }: {
   draft: any;
   feedback: any;
@@ -42,6 +44,8 @@ export async function reviseDraft({
   brief?: any;
   research?: any;
   metafieldSamples?: any[];
+  storeName?: string;
+  productTypes?: string[];
 }) {
   const bv = brandVoice ? (typeof brandVoice === 'string' ? brandVoice : brandVoice.text || '') : '';
   const intent = brief?.intent || (research?.summary ? research.summary.slice(0, 600) : '');
@@ -63,6 +67,7 @@ export async function reviseDraft({
   const samplesStr = (metafieldSamples && metafieldSamples.length) ? JSON.stringify(metafieldSamples.slice(0,3)).slice(0,1200) : 'none';
 
   const productsStr = products.length ? JSON.stringify(products.slice(0, 8).map((p: any) => ({ title: p.title, handle: p.handle, desc: (p.descriptionHtml || '').slice(0, 80) }))) : 'none';
+  const catalogStr = [storeName, ...(productTypes || [])].filter(Boolean).join(' ');
 
   const fb = typeof feedback === 'string' ? feedback : JSON.stringify(feedback || {});
   const rulesText = formatSEORulesForPrompt(seoRules);
@@ -77,6 +82,7 @@ Research angles: ${researchSum}
 Brand voice: ${bv}
 Type: ${type}
 Placement: ${placement ? JSON.stringify(placement) : 'default'}
+Catalog: ${catalogStr}
 
 Grader feedback (use this to drive changes; address violations by ruleId):
 ${fb}

@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { xai, XAI_MODEL } from '../../ai/xai';
 import { formatSEORulesForPrompt } from '../../seo/rules';
 
-export async function writeDraft({ storeId, brief, type = 'collection', platform, brandVoice, seoRules, metafieldDefinitions, placement, products = [], metafieldSamples = [] }: { storeId: string; brief: any; type?: string; platform?: string; brandVoice?: any; seoRules?: any; metafieldDefinitions?: any[]; placement?: any; products?: any[]; metafieldSamples?: any[] }) {
+export async function writeDraft({ storeId, brief, type = 'collection', platform, brandVoice, seoRules, metafieldDefinitions, placement, products = [], metafieldSamples = [], storeName = '', productTypes = [] }: { storeId: string; brief: any; type?: string; platform?: string; brandVoice?: any; seoRules?: any; metafieldDefinitions?: any[]; placement?: any; products?: any[]; metafieldSamples?: any[]; storeName?: string; productTypes?: string[] }) {
   const bv = brandVoice ? (typeof brandVoice === 'string' ? brandVoice : brandVoice.text || '') : '';
   const bvPart = bv ? ` Follow this brand voice: ${bv}.` : '';
   const plat = platform || brief.platform || '';
@@ -17,6 +17,7 @@ export async function writeDraft({ storeId, brief, type = 'collection', platform
 
   const placementStr = placement ? JSON.stringify(placement) : 'default';
   const productsStr = products.length ? JSON.stringify(products.slice(0, 8).map((p: any) => ({ title: p.title, handle: p.handle, desc: (p.descriptionHtml || '').slice(0, 100) }))) : 'none';
+  const catalogStr = [storeName, ...(productTypes || [])].filter(Boolean).join(' ');
   const rulesText = formatSEORulesForPrompt(seoRules);
 
   const prompt = `Create high-quality SEO content for a ${p}${type} about keyword "${brief.keyword}".${bvPart}
@@ -24,6 +25,7 @@ STRICTLY follow these SEO rules:
 ${rulesText}
 Primary goal: best SEO for this exact keyword and job.
 Store placement: ${placementStr}
+Catalog: ${catalogStr}
 Available products (use for recommendations, include in collection, link in content; copy shopifyId exactly for selectedProductIds): ${productsStr}
 Available metafield definitions (use SELECTIVELY only the ones that help this specific keyword/job for best SEO; you do NOT have to use all or any. It is fine to use a subset e.g. 4 out of 8. Supply namespace, key, type, value.):
 ${defsStr}

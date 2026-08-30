@@ -2,7 +2,7 @@ import { generateText } from 'ai';
 import { xai, XAI_MODEL } from '../../ai/xai';
 import { formatSEORulesForPrompt } from '../../seo/rules';
 
-export async function editDraft({ storeId, draft, type = 'collection', platform, brandVoice, seoRules, metafieldDefinitions, placement, products = [], metafieldSamples = [] }: { storeId: string; draft: any; type?: string; platform?: string; brandVoice?: any; seoRules?: any; metafieldDefinitions?: any[]; placement?: any; products?: any[]; metafieldSamples?: any[] }) {
+export async function editDraft({ storeId, draft, type = 'collection', platform, brandVoice, seoRules, metafieldDefinitions, placement, products = [], metafieldSamples = [], storeName = '', productTypes = [] }: { storeId: string; draft: any; type?: string; platform?: string; brandVoice?: any; seoRules?: any; metafieldDefinitions?: any[]; placement?: any; products?: any[]; metafieldSamples?: any[]; storeName?: string; productTypes?: string[] }) {
   const bv = brandVoice ? (typeof brandVoice === 'string' ? brandVoice : brandVoice.text || '') : '';
   const content = (draft.bodyHtml || '').slice(0, 1500);
   const rulesText = formatSEORulesForPrompt(seoRules);

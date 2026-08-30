@@ -10,4 +10,5 @@ export interface CatalogDraft {
   selectedProducts?: Array<{ shopifyId: string; title?: string; handle?: string; imageUrl?: string }>;
   collectionRules?: any[];
   collectionStrategy?: 'manual' | 'rules';
+  brief?: any;
 }

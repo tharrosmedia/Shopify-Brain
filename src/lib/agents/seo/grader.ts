@@ -26,6 +26,8 @@ export async function gradeDraft({
   brief,
   research,
   metafieldSamples = [],
+  storeName = '',
+  productTypes = [],
 }: {
   draft: any;
   type?: string;
@@ -38,6 +40,8 @@ export async function gradeDraft({
   brief?: any;
   research?: any;
   metafieldSamples?: any[];
+  storeName?: string;
+  productTypes?: string[];
 }) {
   const bv = brandVoice ? (typeof brandVoice === 'string' ? brandVoice : brandVoice.text || '') : '';
   const intent = brief?.intent || (research && research.summary ? research.summary.slice(0, 500) : '');
@@ -51,6 +55,7 @@ export async function gradeDraft({
     : 'none';
   const samplesStr = (metafieldSamples && metafieldSamples.length) ? JSON.stringify(metafieldSamples.slice(0,2)).slice(0,800) : 'none';
   const prods = products.length ? products.slice(0, 6).map((p: any) => `${p.title} (/${p.handle})`).join('; ') : 'none';
+  const catalogStr = [storeName, ...(productTypes || [])].filter(Boolean).join(' ');
   const rulesText = formatSEORulesForPrompt(seoRules);
 
   const prompt = `You are an expert SEO grader and editor coach. Grade this ${type} draft on a 0-10 scale (8.5+ is required before human approval). Use the structured SEO rules below as the STRICT rubric.
@@ -62,6 +67,7 @@ Searcher intent: ${intent}
 Research summary: ${researchSum}
 Brand voice: ${bv}
 Platform: ${platform || ''}
+Catalog: ${catalogStr}
 
 Current draft:
 title: ${draft.title || ''}

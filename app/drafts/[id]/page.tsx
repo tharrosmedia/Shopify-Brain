@@ -109,19 +109,23 @@ export default async function DraftDetail({ params }: { params: Promise<{ id: st
   if (!draft) notFound();
 
   let brandVoice: any = null;
+  let jobType = 'collection';
   try {
-    const job = await getJob(draft.jobId);
-    brandVoice = job?.input?.brandVoice || null;
+    const j = await getJob(draft.jobId);
+    brandVoice = j?.input?.brandVoice || null;
+    jobType = j?.type || 'collection';
   } catch {}
 
   let availableMetafields: any[] = [];
   let placement: any = null;
   try {
-    const sid = await getActiveStoreId();
+    const sid = draft.storeId || await getActiveStoreId();
     if (sid) {
       const s = await getStore(sid);
       if (s) {
-        placement = s.config?.placement || null;
+        const rawPlacement = s.config?.placement || null;
+        const typePlacement = rawPlacement ? (rawPlacement[jobType] || rawPlacement.default || rawPlacement) : null;
+        placement = typePlacement;
         if (s.shopify_access_token) {
           const client = createAdminClient(s.shopify_domain, s.shopify_access_token);
           availableMetafields = await fetchMetafieldDefinitions(client);
@@ -170,9 +174,10 @@ export default async function DraftDetail({ params }: { params: Promise<{ id: st
         </div>
       )}
 
-      {(draft.rawResearch || draft.evaluationScores) && (
+      {(draft.rawResearch || draft.evaluationScores || draft.brief) && (
         <div className="mb-6 text-sm border p-3 bg-muted">
           <h4 className="font-medium mb-1">Brief / Research / Gate (P2)</h4>
+          {draft.brief && <div className="mb-1 text-xs">Brief: {JSON.stringify(draft.brief).slice(0,400)}...</div>}
           {draft.rawResearch?.summary && <div className="mb-1">Research: {draft.rawResearch.summary.slice(0,300)}...</div>}
           {draft.evaluationScores?.topicGate && (
             <div className="mt-1">

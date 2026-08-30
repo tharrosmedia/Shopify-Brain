@@ -25,6 +25,8 @@ export interface Placement {
 
 export interface BrandVoice {
   text: string;
+  allowedClaims?: string[];
+  forbiddenClaims?: string[];
   inferredAt?: string;
   samplesUsed?: number;
 }

@@ -1,33 +1,33 @@
 import { neon } from '@neondatabase/serverless';
 import 'dotenv/config';
 
-export async function saveDraft({ jobId, storeId, title, handle, bodyHtml, metaTitle, metaDescription, metafields, schemaJsonLd, rawResearch, evaluationScores, selectedProducts, collectionRules }: { jobId?: string; storeId: string; title: string; handle: string; bodyHtml: string; metaTitle?: string; metaDescription?: string; metafields?: any; schemaJsonLd?: any; rawResearch?: any; evaluationScores?: any; selectedProducts?: any; collectionRules?: any }) {
+export async function saveDraft({ jobId, storeId, title, handle, bodyHtml, metaTitle, metaDescription, metafields, schemaJsonLd, rawResearch, evaluationScores, selectedProducts, collectionRules, brief }: { jobId?: string; storeId: string; title: string; handle: string; bodyHtml: string; metaTitle?: string; metaDescription?: string; metafields?: any; schemaJsonLd?: any; rawResearch?: any; evaluationScores?: any; selectedProducts?: any; collectionRules?: any; brief?: any }) {
   const sql = neon(process.env.DATABASE_URL!);
-  const result = await sql`INSERT INTO drafts (job_id, store_id, title, handle, body_html, meta_title, meta_description, metafields, schema_jsonld, raw_research, evaluation_scores, selected_products, collection_rules) VALUES (${jobId || null}, ${storeId}, ${title}, ${handle}, ${bodyHtml}, ${metaTitle || null}, ${metaDescription || null}, ${metafields || null}, ${schemaJsonLd || null}, ${rawResearch || null}, ${evaluationScores || null}, ${selectedProducts || null}, ${collectionRules || null}) RETURNING id, job_id as "jobId", store_id as "storeId", title, handle, body_html as "bodyHtml", meta_title as "metaTitle", meta_description as "metaDescription", metafields, schema_jsonld as "schemaJsonLd", raw_research as "rawResearch", evaluation_scores as "evaluationScores", selected_products as "selectedProducts", collection_rules as "collectionRules", created_at as "createdAt"`;
+  const result = await sql`INSERT INTO drafts (job_id, store_id, title, handle, body_html, meta_title, meta_description, metafields, schema_jsonld, raw_research, evaluation_scores, selected_products, collection_rules, brief) VALUES (${jobId || null}, ${storeId}, ${title}, ${handle}, ${bodyHtml}, ${metaTitle || null}, ${metaDescription || null}, ${metafields || null}, ${schemaJsonLd || null}, ${rawResearch || null}, ${evaluationScores || null}, ${selectedProducts || null}, ${collectionRules || null}, ${brief || null}) RETURNING id, job_id as "jobId", store_id as "storeId", title, handle, body_html as "bodyHtml", meta_title as "metaTitle", meta_description as "metaDescription", metafields, schema_jsonld as "schemaJsonLd", raw_research as "rawResearch", evaluation_scores as "evaluationScores", selected_products as "selectedProducts", collection_rules as "collectionRules", brief, created_at as "createdAt"`;
   return result[0];
 }
 
 export async function getDraft(draftId: string) {
   const sql = neon(process.env.DATABASE_URL!);
-  const result = await sql`SELECT id, job_id as "jobId", store_id as "storeId", title, handle, body_html as "bodyHtml", meta_title as "metaTitle", meta_description as "metaDescription", metafields, schema_jsonld as "schemaJsonLd", raw_research as "rawResearch", evaluation_scores as "evaluationScores", selected_products as "selectedProducts", collection_rules as "collectionRules", created_at as "createdAt" FROM drafts WHERE id = ${draftId}`;
+  const result = await sql`SELECT id, job_id as "jobId", store_id as "storeId", title, handle, body_html as "bodyHtml", meta_title as "metaTitle", meta_description as "metaDescription", metafields, schema_jsonld as "schemaJsonLd", raw_research as "rawResearch", evaluation_scores as "evaluationScores", selected_products as "selectedProducts", collection_rules as "collectionRules", brief, created_at as "createdAt" FROM drafts WHERE id = ${draftId}`;
   return result[0];
 }
 
 export async function getDraftByJobId(jobId: string) {
   const sql = neon(process.env.DATABASE_URL!);
-  const result = await sql`SELECT id, job_id as "jobId", store_id as "storeId", title, handle, body_html as "bodyHtml", meta_title as "metaTitle", meta_description as "metaDescription", metafields, schema_jsonld as "schemaJsonLd", evaluation_scores as "evaluationScores", selected_products as "selectedProducts", collection_rules as "collectionRules", created_at as "createdAt" FROM drafts WHERE job_id = ${jobId} ORDER BY created_at DESC LIMIT 1`;
+  const result = await sql`SELECT id, job_id as "jobId", store_id as "storeId", title, handle, body_html as "bodyHtml", meta_title as "metaTitle", meta_description as "metaDescription", metafields, schema_jsonld as "schemaJsonLd", evaluation_scores as "evaluationScores", selected_products as "selectedProducts", collection_rules as "collectionRules", brief, created_at as "createdAt" FROM drafts WHERE job_id = ${jobId} ORDER BY created_at DESC LIMIT 1`;
   return result[0];
 }
 
 export async function listDrafts(storeId: string, status?: string, limit: number = 50) {
   const sql = neon(process.env.DATABASE_URL!);
   if (status) {
-    return sql`SELECT d.id, d.job_id as "jobId", d.store_id as "storeId", d.title, d.handle, d.body_html as "bodyHtml", d.meta_title as "metaTitle", d.meta_description as "metaDescription", d.metafields, d.schema_jsonld as "schemaJsonLd", d.evaluation_scores as "evaluationScores", d.selected_products as "selectedProducts", d.collection_rules as "collectionRules", d.created_at as "createdAt", j.status as "jobStatus", j.type as "type" FROM drafts d LEFT JOIN jobs j ON d.job_id = j.id WHERE d.store_id = ${storeId} AND j.status = ${status} ORDER BY d.created_at DESC LIMIT ${limit}`;
+    return sql`SELECT d.id, d.job_id as "jobId", d.store_id as "storeId", d.title, d.handle, d.body_html as "bodyHtml", d.meta_title as "metaTitle", d.meta_description as "metaDescription", d.metafields, d.schema_jsonld as "schemaJsonLd", d.evaluation_scores as "evaluationScores", d.selected_products as "selectedProducts", d.collection_rules as "collectionRules", d.brief, d.created_at as "createdAt", j.status as "jobStatus", j.type as "type" FROM drafts d LEFT JOIN jobs j ON d.job_id = j.id WHERE d.store_id = ${storeId} AND j.status = ${status} ORDER BY d.created_at DESC LIMIT ${limit}`;
   }
-  return sql`SELECT d.id, d.job_id as "jobId", d.store_id as "storeId", d.title, d.handle, d.body_html as "bodyHtml", d.meta_title as "metaTitle", d.meta_description as "metaDescription", d.metafields, d.schema_jsonld as "schemaJsonLd", d.evaluation_scores as "evaluationScores", d.selected_products as "selectedProducts", d.collection_rules as "collectionRules", d.created_at as "createdAt", j.status as "jobStatus", j.type as "type" FROM drafts d LEFT JOIN jobs j ON d.job_id = j.id WHERE d.store_id = ${storeId} ORDER BY d.created_at DESC LIMIT ${limit}`;
+  return sql`SELECT d.id, d.job_id as "jobId", d.store_id as "storeId", d.title, d.handle, d.body_html as "bodyHtml", d.meta_title as "metaTitle", d.meta_description as "metaDescription", d.metafields, d.schema_jsonld as "schemaJsonLd", d.evaluation_scores as "evaluationScores", d.selected_products as "selectedProducts", d.collection_rules as "collectionRules", d.brief, d.created_at as "createdAt", j.status as "jobStatus", j.type as "type" FROM drafts d LEFT JOIN jobs j ON d.job_id = j.id WHERE d.store_id = ${storeId} ORDER BY d.created_at DESC LIMIT ${limit}`;
 }
 
-export async function updateDraft(draftId: string, updates: Partial<{ title: string; handle: string; bodyHtml: string; metaTitle: string; metaDescription: string; metafields: any; schemaJsonLd: any; selectedProducts?: any; collectionRules?: any }>) {
+export async function updateDraft(draftId: string, updates: Partial<{ title: string; handle: string; bodyHtml: string; metaTitle: string; metaDescription: string; metafields: any; schemaJsonLd: any; selectedProducts?: any; collectionRules?: any; brief?: any }>) {
   const sql = neon(process.env.DATABASE_URL!);
   const sets: string[] = [];
   const values: any[] = [];
@@ -40,6 +40,7 @@ export async function updateDraft(draftId: string, updates: Partial<{ title: str
   if (updates.schemaJsonLd) { sets.push('schema_jsonld = $' + (values.length + 1)); values.push(updates.schemaJsonLd); }
   if (updates.selectedProducts !== undefined) { sets.push('selected_products = $' + (values.length + 1)); values.push(updates.selectedProducts); }
   if (updates.collectionRules !== undefined) { sets.push('collection_rules = $' + (values.length + 1)); values.push(updates.collectionRules); }
+  if (updates.brief !== undefined) { sets.push('brief = $' + (values.length + 1)); values.push(updates.brief); }
   if (sets.length === 0) return;
   const setClause = sets.join(', ');
   const q = `UPDATE drafts SET ${setClause} WHERE id = $${values.length + 1}`;
