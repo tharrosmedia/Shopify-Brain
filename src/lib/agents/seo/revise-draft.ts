@@ -10,7 +10,7 @@ const ReviseSchema = z.object({
   metaTitle: z.string(),
   metaDescription: z.string(),
   metafields: z.array(z.object({ namespace: z.string(), key: z.string(), type: z.string().optional(), value: z.string() })).optional(),
-  schemaJsonLd: z.any().optional(),
+  schemaJsonLd: z.record(z.string(), z.any()).optional(),
   selectedProductIds: z.array(z.string()).optional(),
   collectionStrategy: z.enum(['manual', 'rules']).optional(),
   collectionRules: z.array(z.object({ column: z.string(), relation: z.string(), condition: z.string() })).optional(),

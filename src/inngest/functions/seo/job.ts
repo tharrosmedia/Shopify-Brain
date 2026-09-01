@@ -155,11 +155,20 @@ export const seoJob = inngest.createFunction(
       console.warn('[SEO] failed to load placement/defs for agents', e);
     }
 
+    await step.invoke('log-pipeline', {
+      function: logEventFn,
+      data: { storeId, actor: 'system', action: 'job.pipeline.start', payload: { type, keyword }, jobId: job.id },
+    });
+
     try {
       try {
         researchResult = await step.invoke('research', {
           function: researchFn,
           data: { storeId, keyword, type, platform, brandVoice, seoRules, metafieldDefinitions, placement, products, metafieldSamples, storeName, productTypes },
+        });
+        await step.invoke('log-research', {
+          function: logEventFn,
+          data: { storeId, actor: 'system', action: 'research.completed', payload: { summaryLen: researchResult?.summary?.length || 0 }, jobId: job.id },
         });
       } catch (err: any) {
         await step.invoke('log-research-fail', {
@@ -174,6 +183,10 @@ export const seoJob = inngest.createFunction(
           function: createBriefFn,
           data: { storeId, keyword, research: researchResult, type, platform, brandVoice, seoRules, metafieldDefinitions, placement, products, metafieldSamples, storeName, productTypes },
         });
+        await step.invoke('log-brief', {
+          function: logEventFn,
+          data: { storeId, actor: 'system', action: 'brief.completed', payload: { intent: brief?.intent }, jobId: job.id },
+        });
       } catch (err: any) {
         await step.invoke('log-brief-fail', {
           function: logEventFn,
@@ -186,6 +199,10 @@ export const seoJob = inngest.createFunction(
         draft = await step.invoke('write', {
           function: writeDraftFn,
           data: { storeId, brief, type, platform, brandVoice, seoRules, metafieldDefinitions, placement, products, metafieldSamples, storeName, productTypes },
+        });
+        await step.invoke('log-write', {
+          function: logEventFn,
+          data: { storeId, actor: 'system', action: 'write.completed', payload: { title: draft?.title }, jobId: job.id },
         });
       } catch (err: any) {
         await step.invoke('log-write-fail', {
@@ -204,10 +221,18 @@ export const seoJob = inngest.createFunction(
         function: editDraftFn,
         data: { storeId, draft, type, platform, brandVoice, seoRules, metafieldDefinitions, placement, products, metafieldSamples, storeName, productTypes },
       });
+      await step.invoke('log-edit', {
+        function: logEventFn,
+        data: { storeId, actor: 'system', action: 'edit.completed', payload: {}, jobId: job.id },
+      });
 
       optimized = await step.invoke('optimize', {
         function: optimizeDraftFn,
         data: { storeId, draft: edited, type, platform, brandVoice, seoRules, metafieldDefinitions, placement, products, metafieldSamples, storeName, productTypes },
+      });
+      await step.invoke('log-optimize', {
+        function: logEventFn,
+        data: { storeId, actor: 'system', action: 'optimize.completed', payload: {}, jobId: job.id },
       });
 
       // Internal grader-driven iteration (strictly internal helpers, no standalone event triggers).
@@ -233,6 +258,11 @@ export const seoJob = inngest.createFunction(
       let best = current;
       let bestScore = scores?.score ?? 0;
       let bestFeedback = scores;
+
+      await step.invoke('log-revisions-start', {
+        function: logEventFn,
+        data: { storeId, actor: 'system', action: 'job.revisions.start', payload: { initialScore: bestScore }, jobId: job.id },
+      });
 
       let iterations = 0;
       const MAX_ITER = 8;
@@ -288,6 +318,11 @@ export const seoJob = inngest.createFunction(
 
       optimized = best;
       scores = bestFeedback;
+
+      await step.invoke('log-revisions-done', {
+        function: logEventFn,
+        data: { storeId, actor: 'system', action: 'job.revisions.done', payload: { iterations, bestScore }, jobId: job.id },
+      });
 
       if (type === 'collection') {
         const sel = selectProductsForCollection({ storeId, keyword, brief, candidateProducts: products, llmSelectedIds: optimized.selectedProductIds });

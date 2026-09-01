@@ -90,7 +90,7 @@ export default async function JobDetail({ params }: { params: Promise<{ id: stri
       <Link href="/" className="underline">← Dashboard</Link>
       <Link href="/history" className="underline ml-4">History</Link>
       <h1 className="text-2xl font-bold my-6">Job {job.id.slice(0, 8)}</h1>
-      {(job.status === 'publishing' || job.status === 'awaiting_approval') && <AutoRefresh interval={3000} />}
+      {(job.status === 'running' || job.status === 'publishing' || job.status === 'awaiting_approval') && <AutoRefresh interval={3000} />}
 
       <div className="mb-6 border p-4 rounded text-sm">
         <div><strong>Status:</strong> {job.status}{job.status === 'publishing' ? ' (creating in Shopify, should be <30s)' : ''}</div>
@@ -104,6 +104,13 @@ export default async function JobDetail({ params }: { params: Promise<{ id: stri
         <div className="mb-4 p-3 bg-blue-100 text-blue-700 rounded text-sm">Publishing in progress. The resource will appear in Shopify shortly. Refresh to update.</div>
       )}
 
+      {job.status === 'running' && (
+        <div className="mb-4 p-3 bg-yellow-100 text-yellow-800 rounded text-sm">
+          SEO agent is running: research → brief → draft → edit → optimize + revision loop (for quality). 
+          This can take 1-3 minutes. Activity Log updates live.
+        </div>
+      )}
+
       {['queued', 'failed', 'timeout'].includes(job.status) && (
         <form action={requeueJob} className="mb-6">
           <input type="hidden" name="jobId" value={job.id} />
@@ -115,7 +122,7 @@ export default async function JobDetail({ params }: { params: Promise<{ id: stri
       )}
 
       <div className="mb-6">
-        <h2 className="font-semibold mb-2">Activity Log (system notes)</h2>
+        <h2 className="font-semibold mb-2">Activity Log (system notes) {job.status === 'running' && <span className="text-xs text-green-600">(live)</span>}</h2>
         <table className="w-full border text-sm">
           <thead>
             <tr className="bg-muted">
@@ -199,7 +206,7 @@ export default async function JobDetail({ params }: { params: Promise<{ id: stri
             })()}
           </>
         ) : (
-          <div className="text-muted-foreground">No output yet. Current status: {job.status}</div>
+          <div className="text-muted-foreground">No output yet. Current status: {job.status}. The agent is processing internal steps (visible in Activity Log below as events arrive).</div>
         )}
       </div>
 

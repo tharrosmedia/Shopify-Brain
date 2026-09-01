@@ -6,7 +6,7 @@ import { formatSEORulesForPrompt } from '../../seo/rules';
 const OptimizeSchema = z.object({
   metaTitle: z.string(),
   metaDescription: z.string().optional(),
-  schemaJsonLd: z.any(),
+  schemaJsonLd: z.record(z.string(), z.any()),
 });
 
 export async function optimizeDraft({ storeId, draft, type = 'collection', platform, brandVoice, seoRules, metafieldDefinitions, placement, products = [], metafieldSamples = [], storeName = '', productTypes = [] }: { storeId: string; draft: any; type?: string; platform?: string; brandVoice?: any; seoRules?: any; metafieldDefinitions?: any[]; placement?: any; products?: any[]; metafieldSamples?: any[]; storeName?: string; productTypes?: string[] }) {
