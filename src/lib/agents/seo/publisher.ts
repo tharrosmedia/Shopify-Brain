@@ -19,8 +19,8 @@ function getSourceValue(draft: any, source: string): any {
 
 function getResourceId(response: any, type: string): string | null {
   if (type === 'page') return response?.data?.pageCreate?.page?.id || response?.data?.pageUpdate?.page?.id || null;
-  if (type === 'blog') return response?.data?.articleCreate?.article?.id || null;
-  return response?.data?.collectionCreate?.collection?.id || null;
+  if (type === 'blog') return response?.data?.articleCreate?.article?.id || response?.data?.articleUpdate?.article?.id || null;
+  return response?.data?.collectionCreate?.collection?.id || response?.data?.collectionUpdate?.collection?.id || null;
 }
 
 function resolveMfType(defs: any[], ns: string, key: string, valForHeuristic?: string): string {
@@ -33,7 +33,7 @@ function resolveMfType(defs: any[], ns: string, key: string, valForHeuristic?: s
   return 'single_line_text_field';
 }
 
-export async function publishContent({ storeId, draft, type = 'collection', platform, brandVoice, products = [], preloaded, metafieldDefinitions = [] }: { storeId: string; draft: any; type?: string; platform?: string; brandVoice?: any; products?: any[]; preloaded?: { domain?: string; accessToken?: string; config?: any }; metafieldDefinitions?: any[] }) {
+export async function publishContent({ storeId, draft, type = 'collection', platform, brandVoice, products = [], preloaded, metafieldDefinitions = [], mode = 'create', shopifyId }: { storeId: string; draft: any; type?: string; platform?: string; brandVoice?: any; products?: any[]; preloaded?: { domain?: string; accessToken?: string; config?: any }; metafieldDefinitions?: any[]; mode?: string; shopifyId?: string; [k: string]: any }) {
   console.time('[PUBLISH] total');
   let store: any;
   if (preloaded && preloaded.accessToken) {
@@ -122,30 +122,47 @@ export async function publishContent({ storeId, draft, type = 'collection', plat
     mainInput.bodyHtml = '';
   }
   let response;
+  const useId = shopifyId || draft.shopifyId;
+  const isImprove = mode === 'improve' && useId;
   if (type === 'page') {
-    // try update existing by handle
-    let updated = false;
-    if (mainInput.handle) {
-      try {
-        const findQ = `query { pages(first:1, query:"handle:${mainInput.handle}") { edges { node { id } } } }`;
-        const findRes = await client.request(findQ, {});
-        const existing = findRes?.data?.pages?.edges?.[0]?.node;
-        if (existing?.id) {
-          const { updatePage } = await import('../../shopify/pages');
-          response = await updatePage(client, existing.id, mainInput);
-          updated = true;
-        }
-      } catch {}
-    }
-    if (!updated) {
-      response = await createAndPublishPage(client, mainInput);
+    if (isImprove && useId) {
+      const { updatePage } = await import('../../shopify/pages');
+      response = await updatePage(client, useId, mainInput);
+    } else {
+      // try update existing by handle
+      let updated = false;
+      if (mainInput.handle) {
+        try {
+          const findQ = `query { pages(first:1, query:"handle:${mainInput.handle}") { edges { node { id } } } }`;
+          const findRes = await client.request(findQ, {});
+          const existing = findRes?.data?.pages?.edges?.[0]?.node;
+          if (existing?.id) {
+            const { updatePage } = await import('../../shopify/pages');
+            response = await updatePage(client, existing.id, mainInput);
+            updated = true;
+          }
+        } catch {}
+      }
+      if (!updated) {
+        response = await createAndPublishPage(client, mainInput);
+      }
     }
   } else if (type === 'blog') {
-    response = await createAndPublishArticle(client, mainInput);
+    if (isImprove && useId) {
+      const { updateArticle } = await import('../../shopify/blogs');
+      response = await updateArticle(client, useId, mainInput);
+    } else {
+      response = await createAndPublishArticle(client, mainInput);
+    }
   } else {
-    console.time('[PUBLISH] create-main');
-    response = await createAndPublishCollection(client, mainInput);
-    console.timeEnd('[PUBLISH] create-main');
+    if (isImprove && useId) {
+      const { updateCollection } = await import('../../shopify/collections');
+      response = await updateCollection(client, useId, mainInput);
+    } else {
+      console.time('[PUBLISH] create-main');
+      response = await createAndPublishCollection(client, mainInput);
+      console.timeEnd('[PUBLISH] create-main');
+    }
   }
   const ownerId = getResourceId(response, type);
   const warnings: string[] = [];

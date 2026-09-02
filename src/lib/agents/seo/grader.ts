@@ -28,6 +28,9 @@ export async function gradeDraft({
   metafieldSamples = [],
   storeName = '',
   productTypes = [],
+  mode = 'create',
+  liveSnapshot = null,
+  gscQueries = [],
 }: {
   draft: any;
   type?: string;
@@ -42,6 +45,9 @@ export async function gradeDraft({
   metafieldSamples?: any[];
   storeName?: string;
   productTypes?: string[];
+  mode?: string;
+  liveSnapshot?: any;
+  gscQueries?: string[];
 }) {
   const bv = brandVoice ? (typeof brandVoice === 'string' ? brandVoice : brandVoice.text || '') : '';
   const intent = brief?.intent || (research && research.summary ? research.summary.slice(0, 500) : '');
