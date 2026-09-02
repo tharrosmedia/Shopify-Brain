@@ -2,9 +2,6 @@ import { createAdminClient } from '../../shopify/client';
 import { createAndPublishCollection, addProductsToCollection, setCollectionRules } from '../../shopify/collections';
 import { createAndPublishPage } from '../../shopify/pages';
 import { createAndPublishArticle } from '../../shopify/blogs';
-import type * as Collections from '../../shopify/collections';
-import type * as Pages from '../../shopify/pages';
-import type * as Blogs from '../../shopify/blogs';
 import { getStore } from '../../db/stores';
 import { setMetafields } from '../../shopify/metafields';
 
@@ -129,7 +126,7 @@ export async function publishContent({ storeId, draft, type = 'collection', plat
   const isImprove = mode === 'improve' && useId;
   if (type === 'page') {
     if (isImprove && useId) {
-      const { updatePage } = await import('../../shopify/pages') as typeof Pages;
+      const { updatePage } = (await import('../../shopify/pages')) as any;
       response = await updatePage(client, useId, mainInput);
     } else {
       // try update existing by handle
@@ -140,7 +137,7 @@ export async function publishContent({ storeId, draft, type = 'collection', plat
           const findRes = await client.request(findQ, {});
           const existing = findRes?.data?.pages?.edges?.[0]?.node;
           if (existing?.id) {
-            const { updatePage } = await import('../../shopify/pages') as typeof Pages;
+            const { updatePage } = (await import('../../shopify/pages')) as any;
             response = await updatePage(client, existing.id, mainInput);
             updated = true;
           }
@@ -152,14 +149,14 @@ export async function publishContent({ storeId, draft, type = 'collection', plat
     }
   } else if (type === 'blog') {
     if (isImprove && useId) {
-      const { updateArticle } = await import('../../shopify/blogs') as typeof Blogs;
+      const { updateArticle } = (await import('../../shopify/blogs')) as any;
       response = await updateArticle(client, useId, mainInput);
     } else {
       response = await createAndPublishArticle(client, mainInput);
     }
   } else {
     if (isImprove && useId) {
-      const { updateCollection } = await import('../../shopify/collections') as typeof Collections;
+      const { updateCollection } = (await import('../../shopify/collections')) as any;
       response = await updateCollection(client, useId, mainInput);
     } else {
       console.time('[PUBLISH] create-main');
