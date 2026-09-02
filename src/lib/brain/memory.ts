@@ -2,6 +2,7 @@ import { neon } from '@neondatabase/serverless';
 import 'dotenv/config';
 import { embed } from 'ai';
 import { openai } from '@ai-sdk/openai';
+import { toSafeJsonb } from '../db/safe-json';
 
 let embeddingsEnabled = !!process.env.OPENAI_API_KEY;
 
@@ -56,10 +57,11 @@ export async function writeKnowledge(storeId: string, content: string, metadata:
   `;
   if (exists.length > 0) return;
 
+  const safeMeta = toSafeJsonb(metadata, 'knowledge.metadata');
   if (!embeddingsEnabled) {
     await sql`
       INSERT INTO knowledge (store_id, content, metadata) 
-      VALUES (${storeId}, ${content}, ${metadata})
+      VALUES (${storeId}, ${content}, ${safeMeta})
     `;
     return;
   }
@@ -71,15 +73,14 @@ export async function writeKnowledge(storeId: string, content: string, metadata:
     });
     await sql`
       INSERT INTO knowledge (store_id, content, metadata, embedding) 
-      VALUES (${storeId}, ${content}, ${metadata}, ${embedding})
+      VALUES (${storeId}, ${content}, ${safeMeta}, ${embedding})
     `;
   } catch (e) {
-    // If embedding fails (no key, quota, etc), still write without embedding (graceful)
     console.warn('embedding failed, writing without vector', e);
     embeddingsEnabled = false;
     await sql`
       INSERT INTO knowledge (store_id, content, metadata) 
-      VALUES (${storeId}, ${content}, ${metadata})
+      VALUES (${storeId}, ${content}, ${safeMeta})
     `;
   }
 }

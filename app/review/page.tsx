@@ -26,7 +26,7 @@ export default async function Review({ searchParams }: { searchParams: Promise<{
   let loadError: string | null = null;
   try {
     if (storeId) {
-      drafts = await listDrafts(storeId, 'awaiting_approval', 20);
+      drafts = await listDrafts(storeId, undefined, 20);
     }
   } catch (e: any) {
     loadError = e.message || 'Failed to load drafts';
@@ -56,7 +56,7 @@ export default async function Review({ searchParams }: { searchParams: Promise<{
           </tr>
         </thead>
         <tbody>
-          {drafts.length === 0 && !loadError && <tr><td colSpan={5} className="p-4 text-muted-foreground">No pending drafts</td></tr>}
+          {drafts.length === 0 && !loadError && <tr><td colSpan={5} className="p-4 text-muted-foreground">No recent drafts</td></tr>}
           {drafts.map((d: any) => (
             <tr key={d.id} className="border-t">
               <td className="p-2">{d.title}</td>

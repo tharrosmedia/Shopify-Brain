@@ -27,7 +27,7 @@ import { checkTopicGate } from '../../../lib/agents/seo/topic-gate';
 export const seoJob = inngest.createFunction(
   { id: 'seo-job', retries: 2, triggers: [{ event: 'seo/job.requested' }] },
   async ({ event, step }: any) => {
-    const data = event.data as { storeId: string; keyword: string; jobId?: string; job_id?: string; type?: string; platform?: string; brandVoice?: any; seoRules?: any };
+    const data = event.data as { storeId: string; keyword: string; jobId?: string; job_id?: string; type?: string; platform?: string; brandVoice?: any; seoRules?: any; mode?: 'create'|'improve'; shopifyId?: string; handle?: string; liveSnapshot?: any; gscQueries?: string[] };
     const storeId = data.storeId;
     const keyword = data.keyword;
     const type = data.type || 'collection';
@@ -36,6 +36,10 @@ export const seoJob = inngest.createFunction(
     const providedSeoRules = data.seoRules;
     const providedJobId = data.jobId || data.job_id;
     const jobId = providedJobId || 'unknown';
+    const mode = data.mode || 'create';
+    const shopifyId = data.shopifyId;
+    const liveSnapshot = data.liveSnapshot;
+    const gscQueries = data.gscQueries || [];
 
     console.log('[INNGEST] seo-job handler started', { jobId, type, eventData: event.data });
 
@@ -63,7 +67,7 @@ export const seoJob = inngest.createFunction(
     try {
       job = await step.invoke('ensure-job', {
         function: ensureJob,
-        data: { storeId, keyword, type, platform, brandVoice, jobId: providedJobId },
+        data: { storeId, keyword, type, platform, brandVoice, jobId: providedJobId, mode, shopifyId, handle: data.handle, liveSnapshot, gscQueries },
       });
     } catch (err: any) {
       console.error('SEO job failed at ensure', err);
@@ -198,7 +202,7 @@ export const seoJob = inngest.createFunction(
       try {
         draft = await step.invoke('write', {
           function: writeDraftFn,
-          data: { storeId, brief, type, platform, brandVoice, seoRules, metafieldDefinitions, placement, products, metafieldSamples, storeName, productTypes },
+          data: { storeId, brief, type, platform, brandVoice, seoRules, metafieldDefinitions, placement, products, metafieldSamples, storeName, productTypes, mode, liveSnapshot, gscQueries },
         });
         await step.invoke('log-write', {
           function: logEventFn,
@@ -215,6 +219,10 @@ export const seoJob = inngest.createFunction(
       if (type === 'collection') {
         const sel = selectProductsForCollection({ storeId, keyword, brief, candidateProducts: products, llmSelectedIds: draft.selectedProductIds });
         draft.selectedProducts = sel.selected;
+      }
+      if (mode === 'improve' && liveSnapshot) {
+        if (!draft.selectedProducts && liveSnapshot.selectedProducts) draft.selectedProducts = liveSnapshot.selectedProducts;
+        if (!draft.collectionRules && liveSnapshot.collectionRules) draft.collectionRules = liveSnapshot.collectionRules;
       }
 
       edited = await step.invoke('edit', {
@@ -246,7 +254,7 @@ export const seoJob = inngest.createFunction(
 
       let gate: any;
       // Integrate deterministic topic gate inside loop to steer (miss lowers score to force revise)
-      gate = checkTopicGate({ draft: current, brief, research: researchResult });
+      gate = checkTopicGate({ draft: current, brief, research: researchResult, gscQueries });
       if (gate.violations && gate.violations.length) {
         scores = scores || {};
         scores.topicGate = gate;
@@ -276,7 +284,7 @@ export const seoJob = inngest.createFunction(
 
         current = await step.invoke('revise', {
           function: reviseDraftFn,
-          data: { draft: current, feedback: scores, type, platform, brandVoice, seoRules, metafieldDefinitions, placement, products, brief, research: researchResult, metafieldSamples, storeName, productTypes },
+          data: { draft: current, feedback: scores, type, platform, brandVoice, seoRules, metafieldDefinitions, placement, products, brief, research: researchResult, metafieldSamples, storeName, productTypes, mode, liveSnapshot, gscQueries },
         });
 
         // Re-optimize meta/schema after revision
@@ -289,6 +297,10 @@ export const seoJob = inngest.createFunction(
           const sel = selectProductsForCollection({ storeId, keyword, brief, candidateProducts: products, llmSelectedIds: current.selectedProductIds });
           current.selectedProducts = sel.selected;
         }
+        if (mode === 'improve' && liveSnapshot) {
+          if (!current.selectedProducts && liveSnapshot.selectedProducts) current.selectedProducts = liveSnapshot.selectedProducts;
+          if (!current.collectionRules && liveSnapshot.collectionRules) current.collectionRules = liveSnapshot.collectionRules;
+        }
 
         scores = await step.invoke('grade', {
           function: gradeDraftFn,
@@ -296,7 +308,7 @@ export const seoJob = inngest.createFunction(
         });
 
         // Integrate deterministic topic gate inside loop to steer (miss lowers score to force revise)
-        gate = checkTopicGate({ draft: current, brief, research: researchResult });
+        gate = checkTopicGate({ draft: current, brief, research: researchResult, gscQueries });
         if (gate.violations && gate.violations.length) {
           scores = scores || {};
           scores.topicGate = gate;
@@ -328,9 +340,17 @@ export const seoJob = inngest.createFunction(
         const sel = selectProductsForCollection({ storeId, keyword, brief, candidateProducts: products, llmSelectedIds: optimized.selectedProductIds });
         optimized.selectedProducts = sel.selected;
       }
+      if (mode === 'improve' && liveSnapshot) {
+        if (!optimized.selectedProducts && liveSnapshot.selectedProducts) optimized.selectedProducts = liveSnapshot.selectedProducts;
+        if (!optimized.collectionRules && liveSnapshot.collectionRules) optimized.collectionRules = liveSnapshot.collectionRules;
+      }
+      if (type === 'collection') {
+        if (!Array.isArray(optimized.selectedProducts)) optimized.selectedProducts = [];
+      }
+      if (!Array.isArray(optimized.collectionRules)) optimized.collectionRules = [];
 
       // P2: final topic gate annotation (advisory)
-      gate = checkTopicGate({ draft: optimized, brief, research: researchResult });
+      gate = checkTopicGate({ draft: optimized, brief, research: researchResult, gscQueries });
       if (!scores) scores = {};
       scores.topicGate = gate;
       if (gate.violations && gate.violations.length) {
@@ -477,7 +497,7 @@ export const seoJob = inngest.createFunction(
       const finalDraft = approvalData.status === 'edited' && approvalData.editedPayload ? approvalData.editedPayload : optimized;
 
       // P2 gate on final (edited or not) for audit
-      const gate = checkTopicGate({ draft: finalDraft, brief, research: researchResult });
+      const gate = checkTopicGate({ draft: finalDraft, brief, research: researchResult, gscQueries });
       if (finalDraft.evaluationScores) finalDraft.evaluationScores.topicGate = gate;
       else finalDraft.evaluationScores = { topicGate: gate };
 
@@ -493,7 +513,7 @@ export const seoJob = inngest.createFunction(
         console.time('[PUBLISH] post-approval-to-result');
         // Inline via step.run (instead of step.invoke to separate fn) to cut Inngest hop latency
         result = await step.run('publish-content', async () => {
-          return publishContent({ storeId, draft: finalDraft, type, platform, brandVoice, products, preloaded: preloadedStore, metafieldDefinitions });
+          return publishContent({ storeId, draft: finalDraft, type, platform, brandVoice, products, preloaded: preloadedStore, metafieldDefinitions, mode, shopifyId: shopifyId || (liveSnapshot && liveSnapshot.shopifyId) });
         });
         console.timeEnd('[PUBLISH] post-approval-to-result');
       } catch (pubErr: any) {

@@ -1,10 +1,19 @@
 import { neon } from '@neondatabase/serverless';
 import 'dotenv/config';
+import { toSafeJsonb } from './safe-json';
 
 export async function saveDraft({ jobId, storeId, title, handle, bodyHtml, metaTitle, metaDescription, metafields, schemaJsonLd, rawResearch, evaluationScores, selectedProducts, collectionRules, brief }: { jobId?: string; storeId: string; title: string; handle: string; bodyHtml: string; metaTitle?: string; metaDescription?: string; metafields?: any; schemaJsonLd?: any; rawResearch?: any; evaluationScores?: any; selectedProducts?: any; collectionRules?: any; brief?: any }) {
   const sql = neon(process.env.DATABASE_URL!);
-  const safeSchemaJsonLd = (schemaJsonLd && typeof schemaJsonLd === 'object' && schemaJsonLd !== null && !Array.isArray(schemaJsonLd)) ? schemaJsonLd : null;
-  const result = await sql`INSERT INTO drafts (job_id, store_id, title, handle, body_html, meta_title, meta_description, metafields, schema_jsonld, raw_research, evaluation_scores, selected_products, collection_rules, brief) VALUES (${jobId || null}, ${storeId}, ${title}, ${handle}, ${bodyHtml}, ${metaTitle || null}, ${metaDescription || null}, ${metafields || null}, ${safeSchemaJsonLd}, ${rawResearch || null}, ${evaluationScores || null}, ${selectedProducts || null}, ${collectionRules || null}, ${brief || null}) RETURNING id, job_id as "jobId", store_id as "storeId", title, handle, body_html as "bodyHtml", meta_title as "metaTitle", meta_description as "metaDescription", metafields, schema_jsonld as "schemaJsonLd", raw_research as "rawResearch", evaluation_scores as "evaluationScores", selected_products as "selectedProducts", collection_rules as "collectionRules", brief, created_at as "createdAt"`;
+  const mf = toSafeJsonb(metafields, 'metafields');
+  const sch = toSafeJsonb(schemaJsonLd, 'schemaJsonLd');
+  const rr = toSafeJsonb(rawResearch, 'rawResearch');
+  const es = toSafeJsonb(evaluationScores, 'evaluationScores');
+  let sel = toSafeJsonb(selectedProducts, 'selectedProducts');
+  let cr = toSafeJsonb(collectionRules, 'collectionRules');
+  const br = toSafeJsonb(brief, 'brief');
+  if (!Array.isArray(sel)) sel = null;
+  if (!Array.isArray(cr)) cr = null;
+  const result = await sql`INSERT INTO drafts (job_id, store_id, title, handle, body_html, meta_title, meta_description, metafields, schema_jsonld, raw_research, evaluation_scores, selected_products, collection_rules, brief) VALUES (${jobId || null}, ${storeId}, ${title}, ${handle}, ${bodyHtml}, ${metaTitle || null}, ${metaDescription || null}, ${mf}, ${sch}, ${rr}, ${es}, ${sel}, ${cr}, ${br}) RETURNING id, job_id as "jobId", store_id as "storeId", title, handle, body_html as "bodyHtml", meta_title as "metaTitle", meta_description as "metaDescription", metafields, schema_jsonld as "schemaJsonLd", raw_research as "rawResearch", evaluation_scores as "evaluationScores", selected_products as "selectedProducts", collection_rules as "collectionRules", brief, created_at as "createdAt"`;
   return result[0];
 }
 
@@ -37,11 +46,11 @@ export async function updateDraft(draftId: string, updates: Partial<{ title: str
   if (updates.bodyHtml) { sets.push('body_html = $' + (values.length + 1)); values.push(updates.bodyHtml); }
   if (updates.metaTitle) { sets.push('meta_title = $' + (values.length + 1)); values.push(updates.metaTitle); }
   if (updates.metaDescription) { sets.push('meta_description = $' + (values.length + 1)); values.push(updates.metaDescription); }
-  if (updates.metafields) { sets.push('metafields = $' + (values.length + 1)); values.push(updates.metafields); }
-  if (updates.schemaJsonLd) { sets.push('schema_jsonld = $' + (values.length + 1)); values.push(updates.schemaJsonLd); }
-  if (updates.selectedProducts !== undefined) { sets.push('selected_products = $' + (values.length + 1)); values.push(updates.selectedProducts); }
-  if (updates.collectionRules !== undefined) { sets.push('collection_rules = $' + (values.length + 1)); values.push(updates.collectionRules); }
-  if (updates.brief !== undefined) { sets.push('brief = $' + (values.length + 1)); values.push(updates.brief); }
+  if (updates.metafields !== undefined) { sets.push('metafields = $' + (values.length + 1)); values.push(toSafeJsonb(updates.metafields, 'metafields')); }
+  if (updates.schemaJsonLd !== undefined) { sets.push('schema_jsonld = $' + (values.length + 1)); values.push(toSafeJsonb(updates.schemaJsonLd, 'schemaJsonLd')); }
+  if (updates.selectedProducts !== undefined) { const s = toSafeJsonb(updates.selectedProducts, 'selectedProducts'); sets.push('selected_products = $' + (values.length + 1)); values.push(Array.isArray(s) ? s : null); }
+  if (updates.collectionRules !== undefined) { const c = toSafeJsonb(updates.collectionRules, 'collectionRules'); sets.push('collection_rules = $' + (values.length + 1)); values.push(Array.isArray(c) ? c : null); }
+  if (updates.brief !== undefined) { sets.push('brief = $' + (values.length + 1)); values.push(toSafeJsonb(updates.brief, 'brief')); }
   if (sets.length === 0) return;
   const setClause = sets.join(', ');
   const q = `UPDATE drafts SET ${setClause} WHERE id = $${values.length + 1}`;
