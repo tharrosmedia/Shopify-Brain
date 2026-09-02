@@ -1,7 +1,8 @@
-export function checkTopicGate({ draft, brief, research }: { draft: any; brief?: any; research?: any }) {
+export function checkTopicGate({ draft, brief, research, gscQueries = [] }: { draft: any; brief?: any; research?: any; gscQueries?: string[]; [k: string]: any }) {
   const keyword = (brief?.primaryKeyword || brief?.keyword || '').toLowerCase();
   const mustCover = (brief?.mustCover || []).map((s: string) => s.toLowerCase());
   const mustNot = (brief?.mustNotCover || []).map((s: string) => s.toLowerCase());
+  const secondaries = (gscQueries || []).map((s: string) => s.toLowerCase());
   const content = ((draft.title || '') + ' ' + (draft.metaTitle || '') + ' ' + (draft.metaDescription || '') + ' ' + (draft.bodyHtml || '')).toLowerCase();
 
   let onTopic = true;

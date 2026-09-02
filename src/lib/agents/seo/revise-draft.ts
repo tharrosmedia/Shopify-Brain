@@ -31,6 +31,9 @@ export async function reviseDraft({
   metafieldSamples = [],
   storeName = '',
   productTypes = [],
+  mode = 'create',
+  liveSnapshot = null,
+  gscQueries = [],
 }: {
   draft: any;
   feedback: any;
@@ -46,6 +49,9 @@ export async function reviseDraft({
   metafieldSamples?: any[];
   storeName?: string;
   productTypes?: string[];
+  mode?: string;
+  liveSnapshot?: any;
+  gscQueries?: string[];
 }) {
   const bv = brandVoice ? (typeof brandVoice === 'string' ? brandVoice : brandVoice.text || '') : '';
   const intent = brief?.intent || (research?.summary ? research.summary.slice(0, 600) : '');
@@ -71,8 +77,10 @@ export async function reviseDraft({
 
   const fb = typeof feedback === 'string' ? feedback : JSON.stringify(feedback || {});
   const rulesText = formatSEORulesForPrompt(seoRules);
-
-  const prompt = `You are an expert SEO reviser. The current draft scored below target on the grader. Use the grader feedback (including any rule violations) to produce a significantly better version. STRICTLY adhere to the SEO rules.
+  const isImprove = mode === 'improve' && liveSnapshot;
+  const snap = isImprove ? JSON.stringify({ title: liveSnapshot.title, handle: liveSnapshot.handle, body: (liveSnapshot.bodyHtml||'').slice(0,600), meta: liveSnapshot.metaTitle }).slice(0,1200) : '';
+  const gscP = gscQueries?.length ? ` GSC queries: ${gscQueries.slice(0,4).join(', ')}` : '';
+  const prompt = `You are an expert SEO reviser. ${isImprove ? 'Improve mode: PATCH the live snapshot (keep handle and shopifyId; do not invent new handle).' : 'The current draft scored below target on the grader.'} Use the grader feedback (including any rule violations) to produce a significantly better version. STRICTLY adhere to the SEO rules.
 
 SEO RULES:
 ${rulesText}
@@ -82,7 +90,8 @@ Research angles: ${researchSum}
 Brand voice: ${bv}
 Type: ${type}
 Placement: ${placement ? JSON.stringify(placement) : 'default'}
-Catalog: ${catalogStr}
+Catalog: ${catalogStr}${gscP}
+${isImprove ? 'Live snapshot to patch: ' + snap : ''}
 
 Grader feedback (use this to drive changes; address violations by ruleId):
 ${fb}
@@ -102,6 +111,7 @@ Rules:
 - Address all rule violations from grader feedback.
 - Do not duplicate content between body and metas.
 - IDs for selectedProductIds must come only from provided products list.
+${isImprove ? '- Keep handle from liveSnapshot. Attach shopifyId if present.' : ''}
 
 Return the complete improved structured draft.`;
 
@@ -111,16 +121,19 @@ Return the complete improved structured draft.`;
       schema: ReviseSchema,
       prompt,
     });
-    return {
+    const out = {
       ...draft,
       ...object,
       type,
       brandVoice,
       platform,
     };
+    if (isImprove && liveSnapshot && liveSnapshot.handle) out.handle = liveSnapshot.handle;
+    if (isImprove && liveSnapshot && liveSnapshot.shopifyId) out.shopifyId = liveSnapshot.shopifyId;
+    return out;
   } catch {
     // fallback: light pass-through with small improvement note
-    return {
+    const out: any = {
       ...draft,
       metaTitle: draft.metaTitle || (draft.title + ' | Options'),
       metaDescription: (draft.metaDescription || (draft.bodyHtml || '').slice(0, 155)),
@@ -128,5 +141,8 @@ Return the complete improved structured draft.`;
       brandVoice,
       platform,
     };
+    if (isImprove && liveSnapshot && liveSnapshot.handle) out.handle = liveSnapshot.handle;
+    if (isImprove && liveSnapshot && liveSnapshot.shopifyId) out.shopifyId = liveSnapshot.shopifyId;
+    return out;
   }
 }

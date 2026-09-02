@@ -227,7 +227,7 @@ export const seoJob = inngest.createFunction(
 
       edited = await step.invoke('edit', {
         function: editDraftFn,
-        data: { storeId, draft, type, platform, brandVoice, seoRules, metafieldDefinitions, placement, products, metafieldSamples, storeName, productTypes },
+        data: { storeId, draft, type, platform, brandVoice, seoRules, metafieldDefinitions, placement, products, metafieldSamples, storeName, productTypes, mode, liveSnapshot, gscQueries },
       });
       await step.invoke('log-edit', {
         function: logEventFn,
@@ -236,7 +236,7 @@ export const seoJob = inngest.createFunction(
 
       optimized = await step.invoke('optimize', {
         function: optimizeDraftFn,
-        data: { storeId, draft: edited, type, platform, brandVoice, seoRules, metafieldDefinitions, placement, products, metafieldSamples, storeName, productTypes },
+        data: { storeId, draft: edited, type, platform, brandVoice, seoRules, metafieldDefinitions, placement, products, metafieldSamples, storeName, productTypes, mode, liveSnapshot, gscQueries },
       });
       await step.invoke('log-optimize', {
         function: logEventFn,
@@ -249,7 +249,7 @@ export const seoJob = inngest.createFunction(
       let current = optimized;
       scores = await step.invoke('grade', {
         function: gradeDraftFn,
-        data: { draft: current, type, platform, brandVoice, seoRules, metafieldDefinitions, placement, products, brief, research: researchResult, metafieldSamples, storeName, productTypes },
+        data: { draft: current, type, platform, brandVoice, seoRules, metafieldDefinitions, placement, products, brief, research: researchResult, metafieldSamples, storeName, productTypes, mode, liveSnapshot, gscQueries },
       });
 
       let gate: any;
@@ -290,7 +290,7 @@ export const seoJob = inngest.createFunction(
         // Re-optimize meta/schema after revision
         current = await step.invoke('optimize', {
           function: optimizeDraftFn,
-          data: { storeId, draft: current, type, platform, brandVoice, seoRules, metafieldDefinitions, placement, products },
+          data: { storeId, draft: current, type, platform, brandVoice, seoRules, metafieldDefinitions, placement, products, mode, liveSnapshot, gscQueries },
         });
 
         if (type === 'collection') {
@@ -304,7 +304,7 @@ export const seoJob = inngest.createFunction(
 
         scores = await step.invoke('grade', {
           function: gradeDraftFn,
-          data: { draft: current, type, platform, brandVoice, seoRules, metafieldDefinitions, placement, products, brief, research: researchResult, metafieldSamples, storeName, productTypes },
+          data: { draft: current, type, platform, brandVoice, seoRules, metafieldDefinitions, placement, products, brief, research: researchResult, metafieldSamples, storeName, productTypes, mode, liveSnapshot, gscQueries },
         });
 
         // Integrate deterministic topic gate inside loop to steer (miss lowers score to force revise)
