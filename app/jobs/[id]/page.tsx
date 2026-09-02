@@ -61,9 +61,7 @@ export default async function JobDetail({ params }: { params: Promise<{ id: stri
         listApprovalsByJob(id),
         listEventsByJob(id),
       ]);
-      if (job.status === 'awaiting_approval') {
-        draft = await getDraftByJobId(id);
-      }
+      draft = await getDraftByJobId(id);
     }
     if (storeId) {
       const s = await getStore(storeId);
@@ -210,13 +208,10 @@ export default async function JobDetail({ params }: { params: Promise<{ id: stri
         )}
       </div>
 
-      {job.status === 'awaiting_approval' && (
+      {draft && (
         <div className="mt-6">
-          {draft ? (
-            <Link href={`/drafts/${draft.id}`} className="underline">Review &amp; Decide →</Link>
-          ) : (
-            <Link href="/review" className="underline">Go to Review Queue to decide →</Link>
-          )}
+          <Link href={`/drafts/${draft.id}`} className="underline">View Draft →</Link>
+          {job.status === 'awaiting_approval' && ' (Review & Decide)'}
         </div>
       )}
     </div>

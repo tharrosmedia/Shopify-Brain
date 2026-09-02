@@ -2,6 +2,7 @@ import { neon } from '@neondatabase/serverless';
 import 'dotenv/config';
 import { encrypt, decrypt } from '../encryption';
 import { cookies } from 'next/headers';
+import { toSafeJsonb } from './safe-json';
 
 export async function listStores() {
   const sql = neon(process.env.DATABASE_URL!);
@@ -27,18 +28,20 @@ export async function getStore(id: string) {
 export async function createStore({ name, shopify_domain, shopify_access_token, platform = 'shopify', config }: { name: string; shopify_domain: string; shopify_access_token: string; platform?: string; config?: any }) {
   const sql = neon(process.env.DATABASE_URL!);
   const encryptedToken = encrypt(shopify_access_token, process.env.ENCRYPTION_KEY!);
-  const result = await sql`INSERT INTO stores (name, shopify_domain, shopify_access_token, platform, config) VALUES (${name}, ${shopify_domain}, ${encryptedToken}, ${platform}, ${config || null}) RETURNING id, name, shopify_domain, platform, config, created_at`;
+  const safeConfig = toSafeJsonb(config, 'store.config');
+  const result = await sql`INSERT INTO stores (name, shopify_domain, shopify_access_token, platform, config) VALUES (${name}, ${shopify_domain}, ${encryptedToken}, ${platform}, ${safeConfig}) RETURNING id, name, shopify_domain, platform, config, created_at`;
   return result[0];
 }
 
 export async function updateStore(id: string, { name, shopify_domain, shopify_access_token, platform = 'shopify', config }: { name: string; shopify_domain: string; shopify_access_token: string; platform?: string; config?: any }) {
   const sql = neon(process.env.DATABASE_URL!);
+  const safeConfig = config !== undefined ? toSafeJsonb(config, 'store.config') : null;
   if (shopify_access_token && shopify_access_token.length > 0) {
     const encrypted = encrypt(shopify_access_token, process.env.ENCRYPTION_KEY!);
-    const result = await sql`UPDATE stores SET name = ${name}, shopify_domain = ${shopify_domain}, shopify_access_token = ${encrypted}, platform = ${platform}, config = ${config !== undefined ? config : null}, updated_at = now() WHERE id = ${id} RETURNING id, name, shopify_domain, platform, config, created_at`;
+    const result = await sql`UPDATE stores SET name = ${name}, shopify_domain = ${shopify_domain}, shopify_access_token = ${encrypted}, platform = ${platform}, config = ${safeConfig}, updated_at = now() WHERE id = ${id} RETURNING id, name, shopify_domain, platform, config, created_at`;
     return result[0];
   } else {
-    const result = await sql`UPDATE stores SET name = ${name}, shopify_domain = ${shopify_domain}, platform = ${platform}, config = ${config !== undefined ? config : null}, updated_at = now() WHERE id = ${id} RETURNING id, name, shopify_domain, platform, config, created_at`;
+    const result = await sql`UPDATE stores SET name = ${name}, shopify_domain = ${shopify_domain}, platform = ${platform}, config = ${safeConfig}, updated_at = now() WHERE id = ${id} RETURNING id, name, shopify_domain, platform, config, created_at`;
     return result[0];
   }
 }

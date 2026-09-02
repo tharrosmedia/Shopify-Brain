@@ -1,5 +1,6 @@
 import { neon } from '@neondatabase/serverless';
 import 'dotenv/config';
+import { toSafeJsonb } from './safe-json';
 
 export async function upsertProduct(storeId: string, product: {
   shopifyId: string;
@@ -12,6 +13,7 @@ export async function upsertProduct(storeId: string, product: {
   tags?: string[];
 }) {
   const sql = neon(process.env.DATABASE_URL!);
+  const safeMf = toSafeJsonb(product.metafields, 'product.metafields');
   const result = await sql`
     INSERT INTO products (store_id, shopify_id, title, handle, description_html, image_url, metafields, product_type, tags, updated_at)
     VALUES (
@@ -21,7 +23,7 @@ export async function upsertProduct(storeId: string, product: {
       ${product.handle || null},
       ${product.descriptionHtml || null},
       ${product.imageUrl || null},
-      ${product.metafields || null},
+      ${safeMf},
       ${product.productType || null},
       ${product.tags || null},
       now()

@@ -110,10 +110,12 @@ export default async function DraftDetail({ params }: { params: Promise<{ id: st
 
   let brandVoice: any = null;
   let jobType = 'collection';
+  let jobStatus = '';
   try {
     const j = await getJob(draft.jobId);
     brandVoice = j?.input?.brandVoice || null;
     jobType = j?.type || 'collection';
+    jobStatus = j?.status || '';
   } catch {}
 
   let availableMetafields: any[] = [];
@@ -200,6 +202,7 @@ export default async function DraftDetail({ params }: { params: Promise<{ id: st
         </div>
       )}
 
+      {jobStatus === 'awaiting_approval' && (
       <form action={decide} className="space-y-4 border p-4 rounded">
         <input type="hidden" name="draftId" value={draft.id} />
         <input type="hidden" name="jobId" value={draft.jobId} />
@@ -252,6 +255,7 @@ export default async function DraftDetail({ params }: { params: Promise<{ id: st
 
         <button type="submit" className="bg-black text-white px-6 py-2">Submit Decision</button>
       </form>
+      )}
     </div>
   );
 }
