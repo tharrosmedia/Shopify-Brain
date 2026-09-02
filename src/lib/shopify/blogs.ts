@@ -1,5 +1,7 @@
 
 
+import { getOnlineStorePublicationId, publishResource } from './publications';
+
 export async function getFirstBlog(adminClient: any): Promise<{ id: string; handle: string }> {
   const query = `
     query getFirstBlog {
@@ -25,8 +27,6 @@ export async function getFirstBlogId(adminClient: any): Promise<string> {
   const blog = await getFirstBlog(adminClient);
   return blog.id;
 }
-
-import { getOnlineStorePublicationId, publishResource } from './publications';
 
 export async function createAndPublishArticle(adminClient: any, input: { title: string; handle?: string; bodyHtml?: string; seoTitle?: string; seoDescription?: string }) {
   const blogId = await getFirstBlogId(adminClient);
@@ -65,6 +65,34 @@ export async function createAndPublishArticle(adminClient: any, input: { title: 
   }
   const pubId = await getOnlineStorePublicationId(adminClient);
   await publishResource(adminClient, article.id, pubId);
+  return response;
+}
+
+export async function updateArticle(adminClient: any, id: string, input: { title?: string; handle?: string; bodyHtml?: string; seoTitle?: string; seoDescription?: string }) {
+  const mutation = `
+    mutation updateArticle($id: ID!, $article: ArticleInput!) {
+      articleUpdate(id: $id, article: $article) {
+        article { id handle }
+        userErrors { field message }
+      }
+    }
+  `;
+  const variables: any = {
+    id,
+    article: {
+      title: input.title,
+      handle: input.handle,
+      bodyHtml: input.bodyHtml || '',
+    },
+  };
+  if (input.seoTitle || input.seoDescription) {
+    variables.article.seo = { title: input.seoTitle || undefined, description: input.seoDescription || undefined };
+  }
+  const response = await adminClient.request(mutation, { variables });
+  const errors = response?.data?.articleUpdate?.userErrors || [];
+  if (errors.length) {
+    throw new Error(errors.map((e: any) => e.message).join('; '));
+  }
   return response;
 }
 

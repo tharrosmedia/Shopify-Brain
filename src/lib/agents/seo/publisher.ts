@@ -1,7 +1,7 @@
 import { createAdminClient } from '../../shopify/client';
-import { createAndPublishCollection, addProductsToCollection, setCollectionRules, updateCollection } from '../../shopify/collections';
-import { createAndPublishPage, updatePage } from '../../shopify/pages';
-import { createAndPublishArticle, updateArticle } from '../../shopify/blogs';
+import { createAndPublishCollection, addProductsToCollection, setCollectionRules } from '../../shopify/collections';
+import { createAndPublishPage } from '../../shopify/pages';
+import { createAndPublishArticle } from '../../shopify/blogs';
 import { getStore } from '../../db/stores';
 import { setMetafields } from '../../shopify/metafields';
 
@@ -126,6 +126,7 @@ export async function publishContent({ storeId, draft, type = 'collection', plat
   const isImprove = mode === 'improve' && useId;
   if (type === 'page') {
     if (isImprove && useId) {
+      const { updatePage } = await import('../../shopify/pages');
       response = await updatePage(client, useId, mainInput);
     } else {
       // try update existing by handle
@@ -136,6 +137,7 @@ export async function publishContent({ storeId, draft, type = 'collection', plat
           const findRes = await client.request(findQ, {});
           const existing = findRes?.data?.pages?.edges?.[0]?.node;
           if (existing?.id) {
+            const { updatePage } = await import('../../shopify/pages');
             response = await updatePage(client, existing.id, mainInput);
             updated = true;
           }
@@ -147,12 +149,14 @@ export async function publishContent({ storeId, draft, type = 'collection', plat
     }
   } else if (type === 'blog') {
     if (isImprove && useId) {
+      const { updateArticle } = await import('../../shopify/blogs');
       response = await updateArticle(client, useId, mainInput);
     } else {
       response = await createAndPublishArticle(client, mainInput);
     }
   } else {
     if (isImprove && useId) {
+      const { updateCollection } = await import('../../shopify/collections');
       response = await updateCollection(client, useId, mainInput);
     } else {
       console.time('[PUBLISH] create-main');
