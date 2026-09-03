@@ -1,61 +1,13 @@
-import { createJob, updateJobStatus } from '@/src/lib/db/jobs';
-import { inngest } from '@/src/inngest/client';
 import { listJobs } from '@/src/lib/db/jobs';
 import Link from 'next/link';
-import { Button } from '@/components/ui/button';
 import { cookies } from 'next/headers';
 import { listStores, getActiveStoreId } from '@/src/lib/db/stores';
 import AutoRefresh from '@/components/auto-refresh';
-import { redirect } from 'next/navigation';
-
-async function triggerJob(formData: FormData) {
-  'use server';
-  const keyword = formData.get('keyword') as string;
-  const type = (formData.get('type') as string) || 'collection';
-  if (!keyword) return;
-  let storeId = await getActiveStoreId();
-  if (!storeId) {
-    redirect('/stores?error=no-store');
-  }
-  const stores = await listStores();
-  const current = stores.find((s: any) => s.id === storeId) || stores[0];
-  const platform = current?.platform || 'shopify';
-  const brandVoice = current?.config?.brandVoice;
-  const seoRules = current?.config?.seoRules;
-  const autonomy = current?.config?.autonomy;
-  if (autonomy?.allowedTypes && !autonomy.allowedTypes.includes(type)) {
-    throw new Error(`Type ${type} not allowed for this store per autonomy config`);
-  }
-  const c = await cookies();
-  if (storeId) {
-    c.set('activeStoreId', storeId, {
-      path: '/',
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-    });
-  }
-  const job = await createJob({ storeId, domain: 'seo', type, input: { keyword, platform, brandVoice, seoRules }, status: 'queued' });
-  console.log('[INNGEST] sending seo/job.requested', { jobId: job.id, type, hasEventKey: !!process.env.INNGEST_EVENT_KEY });
-  try {
-    await inngest.send({
-      name: 'seo/job.requested',
-      data: { storeId, keyword, type, platform, brandVoice, seoRules, jobId: job.id },
-    });
-    console.log('[INNGEST] send completed without throw for', job.id);
-  } catch (e: any) {
-    console.error('Failed to send to Inngest', e);
-    await updateJobStatus(job.id, 'failed');
-    const { revalidatePath } = await import('next/cache');
-    revalidatePath('/');
-    throw new Error(`Failed to queue job for Inngest: ${e.message || e}`);
-  }
-  const { revalidatePath } = await import('next/cache');
-  revalidatePath('/');
-}
+import { countOpenFindings } from '@/src/lib/db/findings';
 
 export const dynamic = 'force-dynamic';
 
-export default async function Dashboard() {
+export default async function CommandCenter() {
   let storeId = await getActiveStoreId();
   const allStores = await listStores();
   if (!storeId && allStores.length > 0) {
@@ -70,16 +22,19 @@ export default async function Dashboard() {
     }
   }
   let jobs: any[] = [];
+  let openFindings = 0;
   let loadError: string | null = null;
   try {
     if (storeId) {
       jobs = await listJobs(storeId, 20);
+      openFindings = await countOpenFindings(storeId);
     }
   } catch (e: any) {
-    loadError = e.message || 'Failed to load jobs';
+    loadError = e.message || 'Failed to load data';
   }
 
   const awaitingApproval = jobs.filter((j: any) => j.status === 'awaiting_approval').length;
+  const seoAwaiting = awaitingApproval; // jobs are seo domain
   const completed = jobs.filter((j: any) => j.status === 'completed').length;
 
   return (
@@ -91,7 +46,7 @@ export default async function Dashboard() {
         <div className="mb-6 p-4 border border-blue-200 bg-blue-50 rounded">
           <p className="font-semibold mb-2">Welcome! Get started by adding your Shopify store.</p>
           <Link href="/stores" className="inline-block bg-black text-white px-4 py-2 rounded text-sm">Go to Store Management →</Link>
-          <p className="text-sm mt-2 text-muted-foreground">Once added, it will be auto-selected and you can trigger SEO jobs.</p>
+          <p className="text-sm mt-2 text-muted-foreground">Once added, it will be auto-selected.</p>
         </div>
       )}
 
@@ -101,32 +56,29 @@ export default async function Dashboard() {
         </div>
       )}
 
-      <div className="grid grid-cols-3 gap-4 mb-8">
-        <div className="border p-4 rounded">
-          <div className="text-sm text-muted-foreground">Awaiting Approval</div>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        <Link href="/seo" className="border p-4 rounded block hover:bg-muted">
+          <div className="text-sm text-muted-foreground">SEO</div>
+          <div className="text-3xl font-bold">{seoAwaiting} awaiting</div>
+          <div className="text-xs text-muted-foreground">{openFindings} findings</div>
+        </Link>
+        <Link href="/review" className="border p-4 rounded block hover:bg-muted">
+          <div className="text-sm text-muted-foreground">Review</div>
           <div className="text-3xl font-bold">{awaitingApproval}</div>
-        </div>
-        <div className="border p-4 rounded">
-          <div className="text-sm text-muted-foreground">Completed</div>
-          <div className="text-3xl font-bold">{completed}</div>
-        </div>
-        <div className="border p-4 rounded">
-          <div className="text-sm text-muted-foreground">Total Jobs</div>
-          <div className="text-3xl font-bold">{jobs.length}</div>
+          <div className="text-xs">global approval queue</div>
+        </Link>
+        <Link href="/stores" className="border p-4 rounded block hover:bg-muted">
+          <div className="text-sm text-muted-foreground">Stores</div>
+          <div className="text-3xl font-bold">{allStores.length}</div>
+        </Link>
+        <div className="border p-4 rounded opacity-60">
+          <div className="text-sm text-muted-foreground">Ads / Inventory / Service / Fulfillment</div>
+          <div className="text-sm">Not enabled</div>
         </div>
       </div>
 
-      <div className="mb-8 border p-4 rounded">
-        <h2 className="font-semibold mb-4">Trigger New Shopify Job</h2>
-        <form action={triggerJob} className="flex gap-2">
-          <input name="keyword" placeholder="e.g. daikin single zone mini split" className="border p-2 flex-1" required />
-          <select name="type" defaultValue="collection" className="border p-2">
-            <option value="collection">Collection</option>
-            <option value="page">Page</option>
-            <option value="blog">Blog Post</option>
-          </select>
-          <Button type="submit">Trigger</Button>
-        </form>
+      <div className="mb-4">
+        <Link href="/seo/create" className="underline">Trigger job → /seo/create</Link>
       </div>
 
       <div>
@@ -136,7 +88,7 @@ export default async function Dashboard() {
             <tr className="bg-muted">
               <th className="p-2 text-left">ID</th>
               <th className="p-2 text-left">Type</th>
-              <th className="p-2 text-left">Keyword / Input</th>
+              <th className="p-2 text-left">Input</th>
               <th className="p-2 text-left">Status</th>
               <th className="p-2 text-left">Created</th>
               <th className="p-2">Actions</th>
@@ -150,7 +102,7 @@ export default async function Dashboard() {
               <tr key={job.id} className="border-t">
                 <td className="p-2 font-mono text-xs">{job.id.slice(0, 8)}</td>
                 <td className="p-2">{job.type}</td>
-                <td className="p-2">{JSON.stringify(job.input)}</td>
+                <td className="p-2 text-xs">{JSON.stringify(job.input).slice(0,120)}</td>
                 <td className="p-2">{job.status}</td>
                 <td className="p-2 text-sm">{new Date(job.createdAt).toLocaleString()}</td>
                 <td className="p-2">
@@ -163,6 +115,7 @@ export default async function Dashboard() {
       </div>
 
       <div className="mt-8 text-sm">
+        <Link href="/seo" className="underline mr-4">SEO Command Center</Link>
         <Link href="/review" className="underline mr-4">Review Queue</Link>
         <Link href="/history" className="underline">Full History</Link>
       </div>

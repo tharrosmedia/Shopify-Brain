@@ -36,6 +36,34 @@ export async function createAndPublishCollection(adminClient: any, input: { titl
   return response;
 }
 
+export async function updateCollection(adminClient: any, id: string, input: { title?: string; handle?: string; bodyHtml?: string; seoTitle?: string; seoDescription?: string }) {
+  const mutation = `
+    mutation updateCollection($input: CollectionInput!) {
+      collectionUpdate(input: $input) {
+        collection { id handle }
+        userErrors { field message }
+      }
+    }
+  `;
+  const variables: any = {
+    input: {
+      id,
+      title: input.title,
+      handle: input.handle,
+      descriptionHtml: input.bodyHtml || '',
+    },
+  };
+  if (input.seoTitle || input.seoDescription) {
+    variables.input.seo = { title: input.seoTitle || undefined, description: input.seoDescription || undefined };
+  }
+  const response = await adminClient.request(mutation, { variables });
+  const errors = response?.data?.collectionUpdate?.userErrors || [];
+  if (errors.length) {
+    throw new Error(errors.map((e: any) => e.message).join('; '));
+  }
+  return response;
+}
+
 // Back-compat alias (used by tests and older references)
 export const createDraftCollection = createAndPublishCollection;
 

@@ -14,6 +14,9 @@ import { publishFn } from './functions/seo/publish';
 import { ensureJob } from './functions/seo/ensure-job';
 import { updateJobStatusFn } from './functions/update-job-status';
 import { logEventFn } from './functions/log-event';
+import { catalogSyncFn } from './functions/seo/catalog-sync';
+import { gscSyncFn } from './functions/seo/gsc-sync';
+import { auditFn } from './functions/seo/audit';
 
 export const functions = [
   seoJob,
@@ -31,4 +34,7 @@ export const functions = [
   publishFn,
   updateJobStatusFn,
   logEventFn,
+  catalogSyncFn,
+  gscSyncFn,
+  auditFn,
 ];

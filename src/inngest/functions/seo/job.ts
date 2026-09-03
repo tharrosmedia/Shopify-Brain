@@ -23,6 +23,7 @@ import { writeKnowledge } from '../../../lib/brain/memory';
 import { listProducts, searchProducts } from '../../../lib/db/products';
 import { selectProductsForCollection } from '../../../lib/agents/seo/select-products';
 import { checkTopicGate } from '../../../lib/agents/seo/topic-gate';
+import * as Sentry from "@sentry/nextjs";
 
 export const seoJob = inngest.createFunction(
   { id: 'seo-job', retries: 2, triggers: [{ event: 'seo/job.requested' }] },
@@ -387,6 +388,10 @@ export const seoJob = inngest.createFunction(
       });
     } catch (err: any) {
       console.error('SEO job failed', err);
+      Sentry.captureException(err, {
+        tags: { jobId: job?.id, keyword, type, step: 'seo-pipeline' },
+        extra: { storeId },
+      });
       if (job?.id) {
         try {
           await step.invoke('update-failed', {
@@ -549,6 +554,10 @@ export const seoJob = inngest.createFunction(
       throw new Error('Publish failed to create main resource');
     } catch (err: any) {
       console.error('SEO job failed', err);
+      Sentry.captureException(err, {
+        tags: { jobId: job?.id, keyword, type, step: 'publish' },
+        extra: { storeId },
+      });
       if (job?.id) {
         try {
           await step.invoke('update-failed2', {

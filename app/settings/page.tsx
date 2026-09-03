@@ -6,7 +6,7 @@ import { inferBrandVoice } from '@/src/lib/agents/brand/voice';
 import { writeKnowledge } from '@/src/lib/brain/memory';
 import { createAdminClient } from '@/src/lib/shopify/client';
 import { fetchStoreSamples, fetchMetafieldDefinitions, fetchMetafieldValueSamples } from '@/src/lib/shopify/content';
-import { syncProductsForStore } from '@/src/lib/shopify/sync';
+import { syncProductsForStore, syncCatalogForStore } from '@/src/lib/shopify/sync';
 import { listProducts } from '@/src/lib/db/products';
 import { getDefaultSEORules } from '@/src/lib/seo/rules';
 import { SEORulesEditor } from '@/components/SEORulesEditor';
@@ -395,10 +395,47 @@ async function syncProductsAction() {
   }
 }
 
+async function syncCatalogAction() {
+  'use server';
+  const { revalidatePath } = await import('next/cache');
+  const { redirect } = await import('next/navigation');
+  const store = await getActiveStore();
+  if (!store || !store.shopify_access_token) {
+    revalidatePath('/settings');
+    redirect('/settings?catalog=error');
+    return;
+  }
+  try {
+    const result = await syncCatalogForStore(store.id);
+    const currentConfig = store.config || {};
+    const newConfig = {
+      ...currentConfig,
+      catalogLastSynced: new Date().toISOString(),
+      catalogSyncedCount: result.synced,
+    };
+    await updateStore(store.id, {
+      name: store.name,
+      shopify_domain: store.shopify_domain,
+      shopify_access_token: '',
+      platform: store.platform || 'shopify',
+      config: newConfig,
+    });
+    revalidatePath('/settings');
+    redirect(`/settings?catalog=synced&count=${result.synced}`);
+  } catch (e: any) {
+    if (e?.digest?.startsWith('NEXT_REDIRECT')) {
+      throw e;
+    }
+    revalidatePath('/settings');
+    const msg = e?.message || 'Failed to sync catalog';
+    redirect(`/settings?catalog=error&message=${encodeURIComponent(msg)}`);
+  }
+}
+
 export const dynamic = 'force-dynamic';
 
-export default async function Settings({ searchParams }: { searchParams?: Promise<{ resync?: string; brand?: string; autonomy?: string; knowledge?: string; url?: string; status?: string; message?: string; placement?: string; placementReason?: string; metafields?: string; products?: string; count?: string; seoRules?: string }> }) {
-  const params = await (searchParams || Promise.resolve({})) as { resync?: string; brand?: string; autonomy?: string; knowledge?: string; url?: string; status?: string; message?: string; placement?: string; placementReason?: string; metafields?: string; products?: string; count?: string; seoRules?: string };
+export default async function Settings({ searchParams }: { searchParams?: Promise<{ resync?: string; brand?: string; autonomy?: string; knowledge?: string; url?: string; status?: string; message?: string; placement?: string; placementReason?: string; metafields?: string; products?: string; count?: string; seoRules?: string; catalog?: string; gsc?: string }> }) {
+  const params = await (searchParams || Promise.resolve({})) as { resync?: string; brand?: string; autonomy?: string; knowledge?: string; url?: string; status?: string; message?: string; placement?: string; placementReason?: string; metafields?: string; products?: string; count?: string; seoRules?: string; catalog?: string; gsc?: string };
   const store = await getActiveStore();
   const config = store?.config || {};
   const bv = config.brandVoice || null;
@@ -480,6 +517,20 @@ export default async function Settings({ searchParams }: { searchParams?: Promis
           Error syncing products: {params.message ? decodeURIComponent(params.message) : 'check that the Admin API token has read_products scope (and regenerate the token in Shopify after adding scopes).'}
         </div>
       )}
+      {params.catalog === 'synced' && (
+        <div className="mb-4 p-3 bg-green-100 text-green-700 rounded text-sm">Live catalog synced ({params.count || '0'} collections/pages/articles).</div>
+      )}
+      {params.catalog === 'error' && (
+        <div className="mb-4 p-3 bg-red-100 text-red-700 rounded text-sm">
+          Error syncing catalog: {params.message ? decodeURIComponent(params.message) : ''}
+        </div>
+      )}
+      {params.gsc === 'connected' && (
+        <div className="mb-4 p-3 bg-green-100 text-green-700 rounded text-sm">Google Search Console connected.</div>
+      )}
+      {params.gsc === 'error' && (
+        <div className="mb-4 p-3 bg-red-100 text-red-700 rounded text-sm">GSC error: {params.message ? decodeURIComponent(params.message) : ''}</div>
+      )}
       {params.seoRules === 'saved' && (
         <div className="mb-4 p-3 bg-green-100 text-green-700 rounded text-sm">SEO Rules saved. Will be used for future jobs (writer, optimize, grade, revise).</div>
       )}
@@ -509,6 +560,8 @@ export default async function Settings({ searchParams }: { searchParams?: Promis
             <div>Placement: {config.placement ? 'Configured' : 'Using defaults'}</div>
             <div>Metafields: {config.metafieldSchema?.lastRefreshed ? `Refreshed ${new Date(config.metafieldSchema.lastRefreshed).toLocaleDateString()} (${config.metafieldSchema.definitions?.length || 0} fields)` : 'Not loaded (use Refresh button)'}</div>
             <div>Products: {config.productsLastSynced ? `Synced ${new Date(config.productsLastSynced).toLocaleDateString()} (${config.productsSyncedCount || 0} products)` : 'Not synced (use button below)'}</div>
+            <div>Catalog: {config.catalogLastSynced ? `Synced ${new Date(config.catalogLastSynced).toLocaleDateString()} (${config.catalogSyncedCount || 0} resources)` : 'Not synced (use button below or /seo/live)'}</div>
+            <div>GSC: {config.gsc?.refreshTokenEnc ? 'Connected' : 'Not connected'}{config.gsc?.lastSyncedAt ? ` (synced ${new Date(config.gsc.lastSyncedAt).toLocaleDateString()})` : ''}</div>
             <div>Brand Voice: {bv ? 'Set' : 'Not set'}{bv && bv.inferredAt ? ` (inferred ${new Date(bv.inferredAt).toLocaleDateString()})` : ''}{bv && (bv.allowedClaims || bv.forbiddenClaims) ? ' + claims' : ''}</div>
             <div>SEO Rules: {config.seoRules && Array.isArray(config.seoRules) ? `${config.seoRules.length} rules` : 'Using defaults'}</div>
             <div>Autonomy: {auto ? 'Set' : 'Defaults (all types, require approval)'}</div>
@@ -533,6 +586,70 @@ export default async function Settings({ searchParams }: { searchParams?: Promis
           <Button type="submit" variant="outline">Sync Products (titles, handles, descriptions, images, metafields)</Button>
         </form>
         <span className="ml-2 text-xs text-muted-foreground">Imports all products. Run on store add and ~weekly. Enables agent to recommend/include real products in collections/pages. If failing, regenerate the Admin API token in Shopify after confirming scopes.</span>
+      </div>
+
+      <div className="mb-8 border p-4 rounded">
+        <h2 className="font-semibold mb-4">Live Catalog Sync (collections, pages, articles)</h2>
+        <form action={syncCatalogAction} className="inline">
+          <Button type="submit" variant="outline">Sync Live Catalog</Button>
+        </form>
+        <span className="ml-2 text-xs text-muted-foreground">Used by SEO command center for GSC mapping + findings. First blog only for articles (v1 limitation). Link to /seo/live for snapshot view.</span>
+      </div>
+
+      <div className="mb-8 border p-4 rounded">
+        <h2 className="font-semibold mb-4">Search Console</h2>
+        {!process.env.GOOGLE_CLIENT_ID && (
+          <div className="text-sm text-red-600 mb-2">GSC not configured on host (missing GOOGLE_* envs). OAuth disabled.</div>
+        )}
+        <div className="text-sm mb-2">
+          Status: {config.gsc?.refreshTokenEnc ? 'Connected' : 'Not connected'} {config.gsc?.lastSyncedAt ? `| last sync ${new Date(config.gsc.lastSyncedAt).toLocaleString()}` : ''}
+          {config.gsc?.propertyUrl ? ` | ${config.gsc.propertyUrl}` : ''}
+        </div>
+        <div className="flex gap-2 items-center mb-2">
+          <a href={`/api/gsc/oauth/start?storeId=${store?.id || ''}`} className="inline-block border px-3 py-1 rounded text-sm">Connect / Reconnect</a>
+           <form action={async () => {
+             'use server';
+             const { revalidatePath } = await import('next/cache');
+             const { redirect } = await import('next/navigation');
+             const s = await getActiveStore();
+             if (s) {
+               const c = { ...(s.config || {}) };
+               if (c.gsc) delete c.gsc;
+               await updateStore(s.id, { name: s.name, shopify_domain: s.shopify_domain, shopify_access_token: '', platform: s.platform || 'shopify', config: c });
+             }
+             revalidatePath('/settings');
+             redirect('/settings?gsc=disconnected');
+           }}>
+             <Button type="submit" variant="outline" size="sm">Disconnect</Button>
+           </form>
+          <form action={async () => {
+            'use server';
+            const { revalidatePath } = await import('next/cache');
+            const { inngest } = await import('@/src/inngest/client');
+            const s = await getActiveStore();
+            if (s?.id) await inngest.send({ name: 'seo/gsc.sync.requested', data: { storeId: s.id } });
+            revalidatePath('/settings');
+          }}>
+            <Button type="submit" variant="outline" size="sm">Sync 28 days</Button>
+          </form>
+          <span className="text-xs text-muted-foreground">Also available in /seo/search</span>
+        </div>
+        <div>
+          <form action={async (fd: FormData) => {
+            'use server';
+            const { revalidatePath } = await import('next/cache');
+            const prop = (fd.get('propertyUrl') as string) || '';
+            const s = await getActiveStore();
+            if (s) {
+              const c = { ...(s.config || {}), gsc: { ...(s.config?.gsc || {}), propertyUrl: prop } };
+              await updateStore(s.id, { name: s.name, shopify_domain: s.shopify_domain, shopify_access_token: '', platform: s.platform || 'shopify', config: c });
+            }
+            revalidatePath('/settings');
+          }} className="flex gap-2">
+            <input name="propertyUrl" defaultValue={config.gsc?.propertyUrl || ''} placeholder="https://www.example.com/ or sc-domain:example.com" className="border p-1 text-sm flex-1" />
+            <Button type="submit" variant="outline" size="sm">Save Property</Button>
+          </form>
+        </div>
       </div>
 
       <div className="mb-8 border p-4 rounded">

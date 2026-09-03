@@ -5,6 +5,7 @@ import { listStores } from '@/src/lib/db/stores';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { redirect } from 'next/navigation';
+import SeoNav from '@/components/seo-nav';
 
 export const metadata: Metadata = {
   title: 'Shopify Brain',
@@ -45,12 +46,7 @@ export default async function RootLayout({
           <div className="max-w-6xl mx-auto flex items-center justify-between">
             <div className="flex items-center gap-4">
               <Link href="/" className="font-bold text-xl">Shopify Brain</Link>
-               <nav className="flex gap-4 text-sm">
-                 <Link href="/stores" className="underline">Stores</Link>
-                 <Link href="/review" className="underline">Review</Link>
-                 <Link href="/history" className="underline">History</Link>
-                 <Link href="/settings" className="underline">Settings</Link>
-               </nav>
+              <SeoNav />
             </div>
             {stores.length > 0 && (
               <form action={setActiveStore} className="flex items-center gap-2">

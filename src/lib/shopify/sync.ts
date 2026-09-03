@@ -3,6 +3,8 @@ import { createAdminClient } from './client';
 import { fetchProducts } from './products';
 import { upsertProduct } from '../db/products';
 import { writeKnowledge } from '../brain/memory';
+import { fetchCatalogResources } from './catalog';
+import { upsertCatalogResource } from '../db/catalog';
 
 export async function syncProductsForStore(storeId: string) {
   const store = await getStore(storeId);
@@ -35,4 +37,25 @@ export async function syncProductsForStore(storeId: string) {
     }
   }
   return { synced: count, totalFetched: prods.length };
+}
+
+export async function syncCatalogForStore(storeId: string) {
+  const store = await getStore(storeId);
+  if (!store || !store.shopify_access_token) {
+    throw new Error('No Shopify credentials for store');
+  }
+  const client = createAdminClient(store.shopify_domain, store.shopify_access_token);
+  const items = await fetchCatalogResources(client);
+  let count = 0;
+  for (const r of items) {
+    try {
+      await upsertCatalogResource(storeId, r);
+      count++;
+    } catch (e) {
+      console.warn('Failed to upsert catalog', r.handle, e);
+    }
+  }
+  // optional knowledge
+  try { await writeKnowledge(storeId, `Catalog snapshot: ${count} resources synced`, { type: 'catalog_sync', count }); } catch {}
+  return { synced: count, totalFetched: items.length };
 }

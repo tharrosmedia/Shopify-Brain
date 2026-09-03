@@ -47,7 +47,15 @@ export interface StoreConfig {
   };
   productsLastSynced?: string;
   productsSyncedCount?: number;
+  catalogLastSynced?: string;
+  catalogSyncedCount?: number;
   seoRules?: SEORule[];
+  gsc?: {
+    propertyUrl?: string;
+    refreshTokenEnc?: string;
+    connectedAt?: string;
+    lastSyncedAt?: string;
+  };
 }
 
 export interface Store {
